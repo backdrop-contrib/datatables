@@ -1,0 +1,5 @@
+name = DataTables
+description = Provides integration of the jquery DataTables plugin into views.
+version = 6.x-0.1
+core = 6.x
+dependencies[] = views
