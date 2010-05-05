@@ -100,11 +100,15 @@ function template_preprocess_datatables_view(&$vars) {
           $column_options['sType'] = 'html';
         }
         $column_options['bSortable'] = TRUE;
-        $column_options['asSorting'] = $order;
       }
     }
 
     $datatable_options['aoColumns'][] = $column_options;
+
+    // Set default sort order
+    if ($options['default'] == $field) {
+      $datatable_options['aaSorting'] = array(array($position, $options['order']));
+    }
 
     // Create a second variable so we can easily find what fields we have and what the
     // CSS classes should be.
@@ -161,3 +165,4 @@ function datatables_get_id() {
   static $datatable_id;
   return 'datatable-'. ++$datatable_id;
 }
+
