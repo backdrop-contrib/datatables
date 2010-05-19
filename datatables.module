@@ -49,6 +49,7 @@ function theme_datatable($header, $rows, $attributes = array(), $caption = NULL)
   drupal_add_js(drupal_get_path('module', 'datatables') .'/dataTables/media/js/jquery.dataTables.js');
   drupal_add_js(drupal_get_path('module', 'datatables') .'/js/datatables.js');
   drupal_add_js(array('datatables' => array('#'. $attributes['id'] => $datatable_options)), 'setting');
+  unset($attributes['datatable_options']);
   
   return theme('table', $header, $rows, $attributes, $caption);
 }
