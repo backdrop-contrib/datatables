@@ -1,5 +1,8 @@
-Drupal.behaviors.datatables = function (context) {
-  $.each(Drupal.settings.datatables, function (selector) {
-    $(selector).dataTable(this);
-  });
-}
+Drupal.behaviors.datatables = {
+  attach: function (context) {
+    console.debug(Drupal.settings.datatables);
+    jQuery.each(Drupal.settings.datatables, function (selector) {
+      jQuery(selector).dataTable(this);
+    });
+  }
+};

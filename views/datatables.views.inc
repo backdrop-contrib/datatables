@@ -7,7 +7,7 @@
  */
 
 /**
- * Implementation of hook_views_plugins().
+ * Implements hook_views_plugins().
  */
 function datatables_views_plugins() {
   $path = drupal_get_path('module', 'datatables') .'/views';

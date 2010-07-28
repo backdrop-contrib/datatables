@@ -26,6 +26,14 @@ class datatables_style_plugin extends views_plugin_style_table {
    */
   function options_form(&$form, &$form_state) {
     parent::options_form($form, $form_state);
+
+    // Check if fields have been added.  Table style plugin will set 
+    // error_markup if fields are not added.
+    // @see views_plugin_style_table::options_form().
+    if (isset($form['error_markup'])) {
+      return;
+    }
+
     unset($form['sticky']);
     unset($form['override']);
 

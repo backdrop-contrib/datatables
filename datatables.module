@@ -7,23 +7,23 @@
  */
 
 /**
- * Implementation of hook_theme().
+ * Implements hook_theme().
  */
 function datatables_theme() {
   return array(
     'datatable' => array(
-      'arguments' => array($header => NULL, $rows => NULL, $attributes => $caption),
+      'variables' => array('header' => NULL, 'rows' => NULL, 'attributes' => NULL, 'caption' => NULL),
     ),
   );
 }
 
 /**
- * Implementation of hook_views_api().
+ * Implements hook_views_api().
  */
 function datatables_views_api() {
   return array(
-    'api' => 2.0,
-    'path' => drupal_get_path('module', 'datatables') .'/views',
+    'api' => 3.0,
+    'path' => drupal_get_path('module', 'datatables') . '/views',
   );
 }
 
@@ -117,7 +117,12 @@ function datatables_views_api() {
  *   An HTML string representing the table.
  * @see theme_table
  */
-function theme_datatable($header, $rows, $attributes = array(), $caption = NULL) {
+function theme_datatable($variables) {
+  $header = $variables['header'];
+  $rows = $variables['rows'];
+  $attributes = $variables['attributes'];
+  $caption = $variables['caption'];
+
   $datatable_options = $attributes['datatable_options'];
   
   // Column settings can either be set with the global options
@@ -186,7 +191,7 @@ function template_preprocess_datatables_view(&$vars) {
       }
       else {
         // Check if rendered field has html
-        if (strlen($handler->rendered_fields[0][$field]) != strlen(strip_tags($handler->rendered_fields[0][$field]))) {
+        if (strlen($fields[$field]->last_render) != strlen(strip_tags($fields[$field]->last_render))) {
           $column_options['sType'] = 'html';
         }
         $column_options['bSortable'] = TRUE;
@@ -246,10 +251,10 @@ function template_preprocess_datatables_view(&$vars) {
   $vars['class'] = 'views-table';
   $vars['id'] = _datatables_get_id();
 
-  drupal_add_css(drupal_get_path('module', 'datatables') .'/dataTables/media/css/demo_table.css');
-  drupal_add_js(drupal_get_path('module', 'datatables') .'/dataTables/media/js/jquery.dataTables.js');
-  drupal_add_js(drupal_get_path('module', 'datatables') .'/js/datatables.js');
-  drupal_add_js(array('datatables' => array('#'. $vars['id'] => $datatable_options)), 'setting');
+  drupal_add_css(drupal_get_path('module', 'datatables') . '/dataTables/media/css/demo_table.css');
+  drupal_add_js(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js');
+  drupal_add_js(drupal_get_path('module', 'datatables') . '/js/datatables.js');
+  drupal_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
 }
 
 /**

@@ -7,14 +7,14 @@
  */
 
 /**
- * Implementation of hook_requirements().
+ * Implements hook_requirements().
  */
 function datatables_requirements($phase) {
   $requirements = array();
   $t = get_t();
 
   $requirements['datatables']['title'] = 'DataTables';
-  if (file_exists(drupal_get_path('module', 'datatables') .'/dataTables/media/js/jquery.dataTables.js')) {
+  if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
     $requirements['datatables']['severity'] = REQUIREMENT_OK;
   }
   else {
