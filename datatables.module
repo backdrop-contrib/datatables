@@ -28,7 +28,94 @@ function datatables_views_api() {
 }
 
 /**
- * Return a themed DataTable
+ * Return a themed DataTable.
+ *
+ * This function takes the same parameters as theme_table, but also allows the 
+ * inclusion of DataTable specific information in the $header and $attributes 
+ * parameters in order to configure a DataTable.  If an id is not set in the 
+ * $attributes paramater, a unique one is generated.
+ *
+ * To set features and options for the DataTable, add
+ * $parameters['datatable_options'] as an associative array.
+ * For example:
+ * @code
+ *   $parameters['datatables_options'] = array(
+ *     'bFilter'   => FALSE,  // Disable filtering of data.
+ *     'bInfo'     => TRUE,   // Show the table information display.
+ *     'aaSorting' => array(  // Sort by 3rd column first, and then 4th column.
+ *        array(2, 'asc'),
+ *        array(3, 'desc'),
+ *      ),
+ *   );
+ * @endcode
+ * See http://datatables.net/usage/features and 
+ * http://datatables.net/usage/options for a full list of features and options.
+ *
+ * To enable column specific options, set the datatable_options for each of the 
+ * columns in the $header parameter.
+ * For example:
+ * @code
+ *   $header = array(
+ *     array(
+ *       'data' => t('Column 1'),
+ *       'datatable_options' => array(
+ *        'bSortable' => TRUE,  // Enable sorting on this column.
+ *       ),
+ *     ),
+ *     array(
+ *       'data' => t('Column 2'),
+ *       'datatable_options' => array(
+ *         'bSearchable' => FALSE, // Disable filtering on this column.
+ *       ),
+ *     ),
+ *   );
+ * @endcode
+ * Note: if the aaColumns option is enabled in $parameters['datatable_options'], 
+ * then all datatable_options in the $header parameter will be ignored, since 
+ * the parameters will override column options.  See 
+ * http://datatables.net/usage/columns for a full list of column options.
+ *
+ * @param $header
+ *   An array containing the table headers. Each element of the array can be
+ *   either a localized string or an associative array with the following keys:
+ *   - "data": The localized title of the table column.
+ *   - Any HTML attributes, such as "colspan", to apply to the column header cell.
+ *   - "datatable_options": An associative array containing DataTable column 
+ *     specific features/options.
+ * @param $rows
+ *   An array of table rows. Every row is an array of cells, or an associative
+ *   array with the following keys:
+ *   - "data": an array of cells
+ *   - Any HTML attributes, such as "class", to apply to the table row.
+ *
+ *   Each cell can be either a string or an associative array with the following keys:
+ *   - "data": The string to display in the table cell.
+ *   - "header": Indicates this cell is a header.
+ *   - Any HTML attributes, such as "colspan", to apply to the table cell.
+ *
+ *   Here's an example for $rows:
+ *   @code
+ *   $rows = array(
+ *     // Simple row
+ *     array(
+ *       'Cell 1', 'Cell 2', 'Cell 3'
+ *     ),
+ *     // Row with attributes on the row and some of its cells.
+ *     array(
+ *       'data' => array('Cell 1', array('data' => 'Cell 2', 'colspan' => 2)), 'class' => 'funky'
+ *     )
+ *   );
+ *   @endcode
+ *
+ * @param $attributes
+ *   An array of HTML attributes to apply to the table tag.  If the
+ *   datatable_options is set, then those options are passed to the 
+ *   dataTable constructor.
+ * @param $caption
+ *   A localized string to use for the <caption> tag.
+ * @return
+ *   An HTML string representing the table.
+ * @see theme_table
  */
 function theme_datatable($header, $rows, $attributes = array(), $caption = NULL) {
   $datatable_options = $attributes['datatable_options'];
@@ -43,7 +130,9 @@ function theme_datatable($header, $rows, $attributes = array(), $caption = NULL)
   }
   
   // Set unique id
-  $attributes['id'] = datatables_get_id();
+  if (!$attributes['id']) {
+    $attributes['id'] = _datatables_get_id();
+  }
 
   drupal_add_css(drupal_get_path('module', 'datatables') .'/dataTables/media/css/demo_table.css');
   drupal_add_js(drupal_get_path('module', 'datatables') .'/dataTables/media/js/jquery.dataTables.js');
@@ -55,7 +144,7 @@ function theme_datatable($header, $rows, $attributes = array(), $caption = NULL)
 }
 
 /**
- * Display a view as a datatable style.
+ * Display a view as a DataTable style.
  */
 function template_preprocess_datatables_view(&$vars) {
   $view     = $vars['view'];
@@ -144,14 +233,18 @@ function template_preprocess_datatables_view(&$vars) {
     $position++;
   }
   
+  // Enable table info display, if necessary.
   $datatable_options['bInfo'] = $options['table_info'];
+
+  // Disable search filter box, if necessary.
+  $datatable_options['bFilter'] = $options['search_box'];
   
   foreach ($vars['rows'] as $num => $row) {
     $vars['row_classes'][$num][] = ($num % 2 == 0) ? 'odd' : 'even';
   }
 
   $vars['class'] = 'views-table';
-  $vars['id'] = datatables_get_id();
+  $vars['id'] = _datatables_get_id();
 
   drupal_add_css(drupal_get_path('module', 'datatables') .'/dataTables/media/css/demo_table.css');
   drupal_add_js(drupal_get_path('module', 'datatables') .'/dataTables/media/js/jquery.dataTables.js');
@@ -162,7 +255,7 @@ function template_preprocess_datatables_view(&$vars) {
 /**
  * Returns an unique DataTable id
  */
-function datatables_get_id() {
+function _datatables_get_id() {
   static $datatable_id;
   return 'datatable-'. ++$datatable_id;
 }
