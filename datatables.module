@@ -190,15 +190,20 @@ function template_preprocess_datatables_view(&$vars) {
         $column_options['bSortable'] = FALSE;
       }
       else {
-        // Check if rendered field has html
+        // Attempt to autodetect the type of field in order to handle sorting correctly.
         if (strlen($fields[$field]->last_render) != strlen(strip_tags($fields[$field]->last_render))) {
           $column_options['sType'] = 'html';
         }
+        elseif (is_numeric($fields[$field]->last_render)) {
+          $column_options['sType'] = 'numeric';
+        }
+        elseif ($fields[$field] instanceof views_handler_field_date) {
+          $column_options['sType'] = 'date';
+        }
         $column_options['bSortable'] = TRUE;
       }
+      $datatable_options['aoColumns'][] = $column_options;
     }
-
-    $datatable_options['aoColumns'][] = $column_options;
 
     // Set default sort order
     if ($options['default'] == $field) {
