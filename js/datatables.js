@@ -21,6 +21,22 @@ Drupal.behaviors.datatables = {
         this.aoColumns.unshift({"bSortable": false});
       }
 
+      // Sanity Check: before creating a datatable, make sure it is not already
+      // created.  If it is, remove old version before new one is created.
+      var table = jQuery(selector);
+      if (table) {
+        // Pull in dataTables master settings.
+        var datatable_settings = jQuery(document).dataTableSettings;
+        if (datatable_settings != 'undefined') {
+          for (var i=0; i < datatable_settings.length; i++) {
+            if (datatable_settings[i].sInstance = selector) {
+              datatable_settings.splice(i, 1);
+              break;
+            }
+          }
+        }
+      }
+
       var datatable = jQuery(selector).dataTable(this);
 
       if (this.bExpandable) {

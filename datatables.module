@@ -18,6 +18,25 @@ function datatables_theme() {
 }
 
 /**
+ * Implements hook_library().
+ */
+function datatables_library() {
+  $libraries['datatables'] = array(
+    'title' => 'DataTables',
+    'website' => 'http://http://datatables.net/',
+    'version' => '1.5',
+    'js' => array(
+      drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js' => array(),
+      drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
+    ),
+    'css' => array(
+      drupal_get_path('module', 'datatables') . '/dataTables/media/css/demo_table.css' => array(),
+    ),
+  );
+  return $libraries;  
+}
+
+/**
  * Implements hook_views_api().
  */
 function datatables_views_api() {
@@ -152,14 +171,10 @@ function theme_datatable($variables) {
  * Display a view as a DataTable style.
  */
 function template_preprocess_datatables_view(&$vars) {
+  // Run views table preprocess function to handle putting rows in columns, 
+  // classes, etc.
+  template_preprocess_views_view_table($vars);
   $view     = $vars['view'];
-
-  // We need the raw data for this grouping, which is passed in as $vars['rows'].
-  // However, the template also needs to use for the rendered fields.  We
-  // therefore swap the raw data out to a new variable and reset $vars['rows']
-  // so that it can get rebuilt.
-  $result   = $vars['rows'];
-  $vars['rows'] = array();
 
   $options  = $view->style_plugin->options;
   $handler  = $view->style_plugin;
@@ -167,27 +182,11 @@ function template_preprocess_datatables_view(&$vars) {
   $fields   = &$view->field;
   $columns  = $handler->sanitize_columns($options['columns'], $fields);
 
-  $active   = !empty($handler->active) ? $handler->active : '';
-  $order    = !empty($handler->order) ? $handler->order : 'asc';
-
-  // Fields must be rendered in order as of Views 2.3, so we will pre-render
-  // everything.
-  $renders = array();
-  $view->row_index = 0;
-  $keys = array_keys($view->field);
-  foreach ($result as $count => $row) {
-    foreach ($keys as $id) {
-      $renders[$count][$id] = $view->field[$id]->theme($row);
-    }
-    $view->row_index = $count;
-  }
-  unset($view->row_index);
-  
   $position = 0;
   foreach ($columns as $field => $column) {
     $column_options = NULL;
     
-    if ($options['hidden_columns'][$field]) {
+    if ($options['hidden_columns'] && $options['hidden_columns'][$field]) {
      // Hidden or expandable columns get the bVisible init option set to false
      $column_options['bVisible'] = FALSE;
 
@@ -196,7 +195,9 @@ function template_preprocess_datatables_view(&$vars) {
 
     // render the header labels
     if ($field == $column && empty($fields[$field]->options['exclude'])) {
+      // Overrides clicksort head defined in template_preprocess_views_view_table().
       $vars['header'][$field] = check_plain(!empty($fields[$field]) ? $fields[$field]->label() : '');
+
       if (empty($options['info'][$field]['sortable']) || !$fields[$field]->click_sortable()) {
         $column_options['bSortable'] = FALSE;
       }
@@ -222,41 +223,6 @@ function template_preprocess_datatables_view(&$vars) {
       $datatable_options['aaSorting'] = array(array($position, $options['order']));
     }
 
-    // Create a second variable so we can easily find what fields we have and what the
-    // CSS classes should be.
-    $vars['fields'][$field] = drupal_clean_css_identifier($field);
-    if ($active == $field) {
-      $vars['fields'][$field] .= ' active';
-    }
-
-    // Add a CSS align class to each field if one was set
-    if (!empty($options['info'][$field]['align'])) {
-      $vars['fields'][$field] .= ' ' . drupal_clean_css_identifier($options['info'][$field]['align']);
-    }
-
-    // Render each field into its appropriate column.
-    foreach ($result as $num => $row) {
-      if (!empty($fields[$field]) && empty($fields[$field]->options['exclude'])) {
-        $field_output = $renders[$num][$field];
-
-        // Don't bother with separators and stuff if the field does not show up.
-        if (empty($field_output) && !empty($vars['rows'][$num][$column])) {
-          continue;
-        }
-
-        // Place the field into the column, along with an optional separator.
-        if (!empty($vars['rows'][$num][$column])) {
-          if (!empty($options['info'][$column]['separator'])) {
-            $vars['rows'][$num][$column] .= filter_xss_admin($options['info'][$column]['separator']);
-          }
-        }
-        else {
-          $vars['rows'][$num][$column] = '';
-        }
-
-        $vars['rows'][$num][$column] .= $field_output;
-      }
-    }
     $position++;
   }
   
@@ -295,20 +261,9 @@ function template_preprocess_datatables_view(&$vars) {
       break;
   }
 
-  $count = 0;
-  foreach ($vars['rows'] as $num => $row) {
-    $vars['row_classes'][$num][] = ($count++ % 2 == 0) ? 'odd' : 'even';
-  }
+  $vars['id'] = _datatables_get_id();
 
-  $vars['row_classes'][0][] = 'views-row-first';
-  $vars['row_classes'][count($vars['row_classes']) - 1][] = 'views-row-last';
-
-  $vars['class'] = array('views-table');
-  $vars['class'][] = 'cols-'. count($vars['rows']);
-
-  drupal_add_css(drupal_get_path('module', 'datatables') . '/dataTables/media/css/demo_table.css');
-  drupal_add_js(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js');
-  drupal_add_js(drupal_get_path('module', 'datatables') . '/js/datatables.js');
+  drupal_add_library('datatables', 'datatables');
   drupal_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
 }
 

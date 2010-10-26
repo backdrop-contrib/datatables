@@ -45,8 +45,8 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['elements'] = array(
       '#type' => 'fieldset',
       '#title' => t('Widgets & Elements'),
-      '#collapsible' => FALSE,
-      '#collapsed' => FALSE,        
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,        
     );
     $form['elements']['search_box'] = array(
       '#type' => 'checkbox',
@@ -70,8 +70,8 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['layout'] = array(
       '#type' => 'fieldset',
       '#title' => t('Layout and Display'),
-      '#collapsible' => FALSE,
-      '#collapsed' => FALSE,      
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,      
     );
     
     $form['layout']['autowidth'] = array(
@@ -98,8 +98,8 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['pages'] = array(
       '#type' => 'fieldset',
       '#title' => t('Pagination and Page Length'),
-      '#collapsible' => FALSE,
-      '#collapsed' => FALSE,
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
     );
     $form['pages']['pagination_style'] = array(
       '#type' => 'select',
@@ -131,8 +131,8 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['hidden_columns'] = array(
       '#type' => 'fieldset',
       '#title' => t('Hidden and Expandable Columns'),
-      '#collapsible' => FALSE,
-      '#collapsed' => FALSE,
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
     );
     
     foreach($columns as $column_name => $column_label) {

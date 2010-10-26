@@ -14,7 +14,7 @@
  *   $rows are keyed by row number, fields within rows are keyed by field ID.
  */
 ?>
-<table id="<?php print $id ?>" class="<?php print $class; ?>">
+<table id="<?php print $id ?>" class="<?php print implode(' ', $class); ?>">
   <?php if (!empty($title)) : ?>
     <caption><?php print $title; ?></caption>
   <?php endif; ?>
