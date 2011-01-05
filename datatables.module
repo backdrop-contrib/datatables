@@ -142,27 +142,27 @@ function theme_datatable($variables) {
   $attributes = $variables['attributes'];
   $caption = $variables['caption'];
 
-  $datatable_options = $attributes['datatable_options'];
-  
-  // Column settings can either be set with the global options
-  // or in each header definition.
-  if (!$datatable_options['aoColumns']) {
-    foreach ($header as $key => $cell) {
-      $datatable_options['aoColumns'][] = $cell['datatable_options'];
-      unset($header[$key]['datatable_options']);
+  if ($rows) {
+    $datatable_options = $attributes['datatable_options'];
+    
+    // Column settings can either be set with the global options
+    // or in each header definition.
+    if (!$datatable_options['aoColumns']) {
+      foreach ($header as $key => $cell) {
+        $datatable_options['aoColumns'][] = $cell['datatable_options'];
+        unset($header[$key]['datatable_options']);
+      }
     }
-  }
-  
-  // Set unique id
-  if (!$attributes['id']) {
-    $attributes['id'] = _datatables_get_id();
-  }
+    
+    // Set unique id
+    if (!$attributes['id']) {
+      $attributes['id'] = _datatables_get_id();
+    }
 
-  drupal_add_css(drupal_get_path('module', 'datatables') .'/dataTables/media/css/demo_table.css');
-  drupal_add_js(drupal_get_path('module', 'datatables') .'/dataTables/media/js/jquery.dataTables.js');
-  drupal_add_js(drupal_get_path('module', 'datatables') .'/js/datatables.js');
-  drupal_add_js(array('datatables' => array('#'. $attributes['id'] => $datatable_options)), 'setting');
-  unset($attributes['datatable_options']);
+    drupal_add_library('datatables', 'datatables');
+    drupal_add_js(array('datatables' => array('#'. $attributes['id'] => $datatable_options)), 'setting');
+    unset($attributes['datatable_options']);
+  }
   
   return theme('table', $header, $rows, $attributes, $caption);
 }
@@ -174,6 +174,12 @@ function template_preprocess_datatables_view(&$vars) {
   // Run views table preprocess function to handle putting rows in columns, 
   // classes, etc.
   template_preprocess_views_view_table($vars);
+
+  // No need to add anything if there are no rows
+  if (!$vars['rows']) {
+    return;
+  }
+
   $view     = $vars['view'];
 
   $options  = $view->style_plugin->options;
@@ -186,7 +192,7 @@ function template_preprocess_datatables_view(&$vars) {
   foreach ($columns as $field => $column) {
     $column_options = NULL;
     
-    if ($options['hidden_columns'] && $options['hidden_columns'][$field]) {
+    if (isset($options['hidden_columns']) && $options['hidden_columns'][$field]) {
      // Hidden or expandable columns get the bVisible init option set to false
      $column_options['bVisible'] = FALSE;
 

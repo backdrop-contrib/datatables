@@ -13,11 +13,28 @@
 class datatables_style_plugin extends views_plugin_style_table {
   function option_definition() {
     $options = parent::option_definition();
+
     unset($options['sticky']);
     unset($options['override']);
     
-    $options['elements']['search_box'] = array('default' => TRUE);
-    $options['elements']['table_info'] = array('default' => TRUE);
+    $options['elements'] = array(
+      'default' => array(
+        'search_box' => TRUE,
+        'table_info' => TRUE,
+        'save_state' => FALSE,
+    ));
+    $options['layout'] = array(
+      'default' => array(
+        'autowidth' => FALSE,
+        'themeroller' => FALSE,
+        'sdom' => '',
+    ));
+    $options['pages'] = array(
+      'default' => array(
+        'pagination_style' => 0,
+        'length_change' => 0,
+        'display_length' => 10,
+    ));
     return $options;
   }
 
@@ -40,8 +57,6 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['description_markup']['#markup'] = '<div class="description form-item">' . t('DataTables works best if you set the pager to display all items, since DataTabels contains its own pager implementation.<br/><br/>Place fields into columns; you may combine multiple fields into the same column. If you do, the separator in the column specified will be used to separate the fields. Check the sortable box to make that column click sortable, and check the default sort radio to determine which column will be sorted by default, if any. You may control column order and field labels in the fields section.') . '</div>';
 
 
-    // Style plugins currently can't have collapsible fieldsets.
-    // @see http://drupal.org/node/893862
     $form['elements'] = array(
       '#type' => 'fieldset',
       '#title' => t('Widgets & Elements'),

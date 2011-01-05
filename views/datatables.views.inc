@@ -23,6 +23,7 @@ function datatables_views_plugins() {
         'parent' => 'table',
         'theme' => 'datatables_view',
         'uses row plugin' => FALSE,
+        'uses row class' => TRUE,
         'uses fields' => TRUE,
         'uses options' => TRUE,
         'type' => 'normal',
