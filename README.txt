@@ -1,4 +1,3 @@
-// $Id$
 
 This module provides views integration for the DataTables jQuery plugin, which 
 provides advanced interaction controls to HTML tables such as dynamic
