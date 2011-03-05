@@ -27,7 +27,7 @@ Drupal.behaviors.datatables = {
       if (table) {
         // Pull in dataTables master settings.
         var datatable_settings = jQuery(document).dataTableSettings;
-        if (datatable_settings != 'undefined') {
+        if (datatable_settings !== undefined) {
           for (var i=0; i < datatable_settings.length; i++) {
             if (datatable_settings[i].sInstance = selector) {
               datatable_settings.splice(i, 1);
