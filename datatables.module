@@ -20,19 +20,34 @@ function datatables_theme() {
  * Implements hook_library().
  */
 function datatables_library() {
-  $libraries['datatables'] = array(
-    'title' => 'DataTables',
-    'website' => 'http://http://datatables.net/',
-    'version' => '1.5',
-    'js' => array(
-      drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js' => array(),
-      drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
-    ),
-    'css' => array(
-      drupal_get_path('module', 'datatables') . '/dataTables/media/css/demo_table.css' => array(),
-    ),
-  );
-  return $libraries;  
+   $libraries = array();
+
+   // Locate the DataTables JS library (borrowed from install code)
+   $lib_path = NULL;
+   if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
+     $lib_path = drupal_get_path('module', 'datatables') . '/dataTables';
+   }
+   else if (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
+     $lib_path = libraries_get_path('datatables');
+   }
+
+   // Make sure we have a valid library path before returning library load info
+   if (!empty($lib_path)) {
+     $libraries['datatables'] = array(
+       'title' => 'DataTables',
+       'website' => 'http://http://datatables.net/',
+       'version' => '1.5',
+       'js' => array(
+         $lib_path . '/media/js/jquery.dataTables.js' => array(),
+         drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
+       ),
+       'css' => array(
+         $lib_path . '/media/css/demo_table.css' => array(),
+       ),
+     );
+   }
+
+  return $libraries;
 }
 
 /**
@@ -48,9 +63,9 @@ function datatables_views_api() {
 /**
  * Return a themed DataTable.
  *
- * This function takes the same parameters as theme_table, but also allows the 
- * inclusion of DataTable specific information in the $header and $attributes 
- * parameters in order to configure a DataTable.  If an id is not set in the 
+ * This function takes the same parameters as theme_table, but also allows the
+ * inclusion of DataTable specific information in the $header and $attributes
+ * parameters in order to configure a DataTable.  If an id is not set in the
  * $attributes paramater, a unique one is generated.
  *
  * To set features and options for the DataTable, add
@@ -66,10 +81,10 @@ function datatables_views_api() {
  *      ),
  *   );
  * @endcode
- * See http://datatables.net/usage/features and 
+ * See http://datatables.net/usage/features and
  * http://datatables.net/usage/options for a full list of features and options.
  *
- * To enable column specific options, set the datatable_options for each of the 
+ * To enable column specific options, set the datatable_options for each of the
  * columns in the $header parameter.
  * For example:
  * @code
@@ -88,9 +103,9 @@ function datatables_views_api() {
  *     ),
  *   );
  * @endcode
- * Note: if the aaColumns option is enabled in $parameters['datatable_options'], 
- * then all datatable_options in the $header parameter will be ignored, since 
- * the parameters will override column options.  See 
+ * Note: if the aaColumns option is enabled in $parameters['datatable_options'],
+ * then all datatable_options in the $header parameter will be ignored, since
+ * the parameters will override column options.  See
  * http://datatables.net/usage/columns for a full list of column options.
  *
  * @param $header
@@ -98,7 +113,7 @@ function datatables_views_api() {
  *   either a localized string or an associative array with the following keys:
  *   - "data": The localized title of the table column.
  *   - Any HTML attributes, such as "colspan", to apply to the column header cell.
- *   - "datatable_options": An associative array containing DataTable column 
+ *   - "datatable_options": An associative array containing DataTable column
  *     specific features/options.
  * @param $rows
  *   An array of table rows. Every row is an array of cells, or an associative
@@ -127,7 +142,7 @@ function datatables_views_api() {
  *
  * @param $attributes
  *   An array of HTML attributes to apply to the table tag.  If the
- *   datatable_options is set, then those options are passed to the 
+ *   datatable_options is set, then those options are passed to the
  *   dataTable constructor.
  * @param $caption
  *   A localized string to use for the <caption> tag.
@@ -143,7 +158,7 @@ function theme_datatable($variables) {
 
   if ($rows) {
     $datatable_options = $attributes['datatable_options'];
-    
+
     // Column settings can either be set with the global options
     // or in each header definition.
     if (!$datatable_options['aoColumns']) {
@@ -152,7 +167,7 @@ function theme_datatable($variables) {
         unset($header[$key]['datatable_options']);
       }
     }
-    
+
     // Set unique id
     if (!$attributes['id']) {
       $attributes['id'] = _datatables_get_id();
@@ -162,7 +177,7 @@ function theme_datatable($variables) {
     drupal_add_js(array('datatables' => array('#'. $attributes['id'] => $datatable_options)), 'setting');
     unset($attributes['datatable_options']);
   }
-  
+
   return theme('table', $header, $rows, $attributes, $caption);
 }
 
@@ -170,7 +185,7 @@ function theme_datatable($variables) {
  * Display a view as a DataTable style.
  */
 function template_preprocess_datatables_view(&$vars) {
-  // Run views table preprocess function to handle putting rows in columns, 
+  // Run views table preprocess function to handle putting rows in columns,
   // classes, etc.
   template_preprocess_views_view_table($vars);
 
@@ -190,7 +205,7 @@ function template_preprocess_datatables_view(&$vars) {
   $position = 0;
   foreach ($columns as $field => $column) {
     $column_options = NULL;
-    
+
     switch ($options['hidden_columns'][$field]) {
       case 'expandable':
         $datatable_options['bExpandable'] = TRUE;
@@ -232,38 +247,38 @@ function template_preprocess_datatables_view(&$vars) {
 
     $position++;
   }
-  
+
   // Enable table info display, if necessary.
   $datatable_options['bInfo'] = $options['elements']['table_info'];
   $datatable_options['bFilter'] = $options['elements']['search_box'];
   $datatable_options['bStateSave'] = $options['elements']['save_state'];
-  
+
   $datatable_options['bLengthChange'] = $options['pages']['length_change'];
   $datatable_options['iDisplayLength'] = (int) $options['pages']['display_length'];
-  
+
   // Enable ThemeRoller support, if necessary.
   if($options['layout']['themeroller']) {
     $datatable_options['bJQueryUI'] = TRUE;
   }
-  
+
   // Pass the sDOM parameter, if one is specified.
   if ($options['layout']['sdom']) {
-    $datatable_options['sDom'] = $options['layout']['sdom'];  
+    $datatable_options['sDom'] = $options['layout']['sdom'];
   }
-  
+
     $datatable_options['bAutoWidth'] = $options['layout']['autowidth'];
-    
+
   // Enable full_numbers pagination if selected
   switch ($options['pages']['pagination_style']) {
     case 'full_numbers':
       $datatable_options['sPaginationType'] = 'full_numbers';
       break;
-    
+
     case 'no_pagination':
       $datatable_options['bPaginate'] = FALSE;
       break;
-    
-    default: 
+
+    default:
       // Do nothing. No parameters need to be sent for the default (two-button) style
       break;
   }
