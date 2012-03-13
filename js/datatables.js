@@ -4,7 +4,8 @@
       $.each(settings.datatables, function (selector) {
         $(selector, context).once('datatables', function() {
           // Check if table contains expandable hidden rows.
-          if (this.bExpandable) {
+          var settings = Drupal.settings.datatables[selector];
+          if (settings.bExpandable) {
             // Insert a "view more" column to the table.
             var nCloneTh = document.createElement('th');
             var nCloneTd = document.createElement('td');
@@ -18,18 +19,18 @@
               this.insertBefore(  nCloneTd.cloneNode( true ), this.childNodes[0] );
             });
 
-            this.aoColumns.unshift({"bSortable": false});
+            settings.aoColumns.unshift({"bSortable": false});
           }
 
-          var datatable = $(selector).dataTable(this);
+          var datatable = $(selector).dataTable(settings);
 
-          if (this.bExpandable) {
+          if (settings.bExpandable) {
             // Add column headers to table settings.
-            var settings = datatable.fnSettings();
+            var datatables_settings = datatable.fnSettings();
             // Add blank column header for show details column.
-            this.aoColumnHeaders.unshift('');
+            settings.aoColumnHeaders.unshift('');
             // Add column headers to table settings.
-            settings.aoColumnHeaders = this.aoColumnHeaders;
+            datatables_settings.aoColumnHeaders = settings.aoColumnHeaders;
 
             /* Add event listener for opening and closing details
             * Note that the indicator for showing which row is open is not controlled by DataTables,
@@ -38,13 +39,13 @@
             $('td a.datatables-expand', datatable.fnGetNodes() ).each( function () {
               $(this).click( function () {
                 var row = this.parentNode.parentNode;
-                if ($(this).hasClass('datatables-open')) {
+                if (datatable.fnIsOpen(row)) {
                   datatable.fnClose(row);
-                  $(this).removeClass('datatables-open').addClass('datatables-closed').html('Show Details');
+                  $(this).html('Show Details');
                 }
                 else {
                   datatable.fnOpen( row, Drupal.theme('datatablesExpandableRow', datatable, row), 'details' );
-                  $(this).removeClass('datatables-closed').addClass('datatables-open').html('Hide Details');
+                  $(this).html('Hide Details');
                 }
                 return false;
               });

@@ -11,10 +11,10 @@ For full documentation and examples, visit the DataTables jQuery plugin page:
 
 * Copy the datatables module to sites/all/modules directory.
 
-* Download the latest DataTables jQuery plugin 1.6 package from:
-    http://plugins.jquery.com/project/DataTables
+* Download the latest DataTables jQuery plugin 1.9 package from:
+    http://datatables.net/download/
 
-* Extract the archive and move the dataTables-1.6/media folder to the 
+* Extract the archive and move the dataTables-1.9/media folder to the 
   sub-directory called dataTables in the datatables folder:
 
     sites/all/modules/datatables/dataTables/

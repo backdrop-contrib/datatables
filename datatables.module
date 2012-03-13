@@ -36,7 +36,7 @@ function datatables_library() {
     $libraries['datatables'] = array(
       'title' => 'DataTables',
       'website' => 'http://http://datatables.net/',
-      'version' => '1.5',
+      'version' => '1.9',
       'js' => array(
         $lib_path . '/media/js/jquery.dataTables.js' => array(),
         drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
