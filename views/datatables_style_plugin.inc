@@ -115,7 +115,7 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['pages']['pagination_style'] = array(
       '#type' => 'select',
       '#title' => t('Pagination Style'),
-      '#default_value' => $this->options['pages']['pagination_style'] ? $this->options['pages']['pagination_style'] : 0,
+      '#default_value' => isset($this->options['pages']['pagination_style']) ? $this->options['pages']['pagination_style'] : 0,
       '#options' => array(
         0 => t('Two-Button (Default)'),
         'full_numbers' => t('Full Numbers'),
@@ -150,7 +150,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       $form['hidden_columns'][$column_name] = array(
         '#type' => 'select',
         '#title' => check_plain($column_label),
-        '#default_value' => $this->options['hidden_columns'][$column_name] ? $this->options['hidden_columns'][$column_name] : 0,
+        '#default_value' => isset($this->options['hidden_columns'][$column_name]) ? $this->options['hidden_columns'][$column_name] : 0,
         '#options' => array(0 => 'Visible', 'hidden' => 'Hidden', 'expandable' => 'Hidden and Expandable'),
       );
     }
