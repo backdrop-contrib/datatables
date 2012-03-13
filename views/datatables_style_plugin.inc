@@ -15,7 +15,7 @@ class datatables_style_plugin extends views_plugin_style_table {
 
     unset($options['sticky']);
     unset($options['override']);
-    
+
     $options['elements'] = array(
       'default' => array(
         'search_box' => TRUE,
@@ -37,15 +37,12 @@ class datatables_style_plugin extends views_plugin_style_table {
     return $options;
   }
 
-  /**
-   * Render the given style.
-   */
   function options_form(&$form, &$form_state) {
     parent::options_form($form, $form_state);
 
-    // Check if fields have been added.  Table style plugin will set 
+    // Check if fields have been added.  Table style plugin will set
     // error_markup if fields are not added.
-    // @see views_plugin_style_table::options_form().
+    // @see views_plugin_style_table::options_form()
     if (isset($form['error_markup'])) {
       return;
     }
@@ -60,7 +57,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#type' => 'fieldset',
       '#title' => t('Widgets & Elements'),
       '#collapsible' => TRUE,
-      '#collapsed' => TRUE,        
+      '#collapsed' => TRUE,
     );
     $form['elements']['search_box'] = array(
       '#type' => 'checkbox',
@@ -80,35 +77,35 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#default_value' => !empty($this->options['elements']['save_state']),
       '#description' => t("DataTables can use cookies in the end user's web-browser in order to store it's state after each change in drawing. What this means is that if the user were to reload the page, the table should remain exactly as it was (length, filtering, pagination and sorting)"),
     );
-    
+
     $form['layout'] = array(
       '#type' => 'fieldset',
       '#title' => t('Layout and Display'),
       '#collapsible' => TRUE,
-      '#collapsed' => TRUE,      
+      '#collapsed' => TRUE,
     );
-    
+
     $form['layout']['autowidth'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable auto-width calculation.'),
       '#default_value' => !empty($this->options['layout']['autowidth']),
       '#description' => t('Enable or disable automatic column width calculation. This can be disabled as an optimisation (it takes some time to calculate the widths).'),
     );
-        
+
     $form['layout']['themeroller'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable jQuery UI ThemeRoller Support'),
       '#default_value' => !empty($this->options['layout']['themeroller']),
       '#description' => t("Create markup and classes to support jQuery UI's ThemeRoller"),
     );
-    
+
     $form['layout']['sdom'] = array(
       '#type' => 'textfield',
       '#title' => t('Set sDOM Initialization Parameter'),
       '#default_value' => $this->options['layout']['sdom'],
       '#description' => t("Use the sDOM parameter to rearrange the interface elements. See the <a href='@sdom_documentation_url'>Datatables sDOM documentation</a> for details on how to use this feature", array('@sdom_documentation_url' => 'http://www.datatables.net/examples/basic_init/dom.html')),
     );
-    
+
     $form['pages'] = array(
       '#type' => 'fieldset',
       '#title' => t('Pagination and Page Length'),
@@ -120,19 +117,19 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Pagination Style'),
       '#default_value' => $this->options['pages']['pagination_style'] ? $this->options['pages']['pagination_style'] : 0,
       '#options' => array(
-        0 => t('Two-Button (Default)'), 
+        0 => t('Two-Button (Default)'),
         'full_numbers' => t('Full Numbers'),
         'no_pagination' => t('No Pagination'),
       ),
       '#description' => t('Selects which pagination style should be used.'),
     );
-    
+
     $form['pages']['length_change'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable Length Change Selection Box'),
       '#default_value' => !empty($this->options['pages']['length_change']),
       '#description' => t('Enable or page length selection menu'),
-    );    
+    );
     $form['pages']['display_length'] = array(
       '#type' => 'select',
       '#title' => t('Default Page Length'),
@@ -140,7 +137,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#options' => array(10 => 10, 25 => 25, 50 => 50, 100 => 100),
       '#description' => t('Default number of records to show per page. May be adjusted by users if Length Selection is enabled'),
     );
-        
+
     $columns = $this->display->handler->get_field_labels();
     $form['hidden_columns'] = array(
       '#type' => 'fieldset',
@@ -148,11 +145,11 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
-    
-    foreach($columns as $column_name => $column_label) {
+
+    foreach ($columns as $column_name => $column_label) {
       $form['hidden_columns'][$column_name] = array(
         '#type' => 'select',
-        '#title' => $column_label,
+        '#title' => check_plain($column_label),
         '#default_value' => $this->options['hidden_columns'][$column_name] ? $this->options['hidden_columns'][$column_name] : 0,
         '#options' => array(0 => 'Visible', 'hidden' => 'Hidden', 'expandable' => 'Hidden and Expandable'),
       );

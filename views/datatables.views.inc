@@ -9,7 +9,7 @@
  * Implements hook_views_plugins().
  */
 function datatables_views_plugins() {
-  $path = drupal_get_path('module', 'datatables') .'/views';
+  $path = drupal_get_path('module', 'datatables') . '/views';
   return array(
     'module' => 'datatables',
     'style' => array(

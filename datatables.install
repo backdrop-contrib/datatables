@@ -16,7 +16,7 @@ function datatables_requirements($phase) {
   if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
     $requirements['datatables']['severity'] = REQUIREMENT_OK;
   }
-  else if (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
+  elseif (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
     $requirements['datatables']['severity'] = REQUIREMENT_OK;
   }
   else {

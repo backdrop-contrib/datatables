@@ -20,32 +20,32 @@ function datatables_theme() {
  * Implements hook_library().
  */
 function datatables_library() {
-   $libraries = array();
+  $libraries = array();
 
-   // Locate the DataTables JS library (borrowed from install code)
-   $lib_path = NULL;
-   if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
-     $lib_path = drupal_get_path('module', 'datatables') . '/dataTables';
-   }
-   else if (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
-     $lib_path = libraries_get_path('datatables');
-   }
+  // Locate the DataTables JS library (borrowed from install code)
+  $lib_path = NULL;
+  if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
+    $lib_path = drupal_get_path('module', 'datatables') . '/dataTables';
+  }
+  elseif (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
+    $lib_path = libraries_get_path('datatables');
+  }
 
-   // Make sure we have a valid library path before returning library load info
-   if (!empty($lib_path)) {
-     $libraries['datatables'] = array(
-       'title' => 'DataTables',
-       'website' => 'http://http://datatables.net/',
-       'version' => '1.5',
-       'js' => array(
-         $lib_path . '/media/js/jquery.dataTables.js' => array(),
-         drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
-       ),
-       'css' => array(
-         $lib_path . '/media/css/demo_table.css' => array(),
-       ),
-     );
-   }
+  // Make sure we have a valid library path before returning library load info
+  if (!empty($lib_path)) {
+    $libraries['datatables'] = array(
+      'title' => 'DataTables',
+      'website' => 'http://http://datatables.net/',
+      'version' => '1.5',
+      'js' => array(
+        $lib_path . '/media/js/jquery.dataTables.js' => array(),
+        drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
+      ),
+      'css' => array(
+        $lib_path . '/media/css/demo_table.css' => array(),
+      ),
+    );
+  }
 
   return $libraries;
 }
@@ -112,7 +112,8 @@ function datatables_views_api() {
  *   An array containing the table headers. Each element of the array can be
  *   either a localized string or an associative array with the following keys:
  *   - "data": The localized title of the table column.
- *   - Any HTML attributes, such as "colspan", to apply to the column header cell.
+ *   - Any HTML attributes, such as "colspan", to apply to the column header
+ *     cell.
  *   - "datatable_options": An associative array containing DataTable column
  *     specific features/options.
  * @param $rows
@@ -148,7 +149,7 @@ function datatables_views_api() {
  *   A localized string to use for the <caption> tag.
  * @return
  *   An HTML string representing the table.
- * @see theme_table
+ * @see theme_table()
  */
 function theme_datatable($variables) {
   $header = $variables['header'];
@@ -174,7 +175,7 @@ function theme_datatable($variables) {
     }
 
     drupal_add_library('datatables', 'datatables');
-    drupal_add_js(array('datatables' => array('#'. $attributes['id'] => $datatable_options)), 'setting');
+    drupal_add_js(array('datatables' => array('#' . $attributes['id'] => $datatable_options)), 'setting');
     unset($attributes['datatable_options']);
   }
 
@@ -225,7 +226,7 @@ function template_preprocess_datatables_view(&$vars) {
       }
       else {
         // Attempt to autodetect the type of field in order to handle sorting correctly.
-        if (strlen($fields[$field]->last_render) != strlen(strip_tags($fields[$field]->last_render))) {
+        if (drupal_strlen($fields[$field]->last_render) != drupal_strlen(strip_tags($fields[$field]->last_render))) {
           $column_options['sType'] = 'html';
         }
         elseif (is_numeric($fields[$field]->last_render)) {
@@ -257,7 +258,7 @@ function template_preprocess_datatables_view(&$vars) {
   $datatable_options['iDisplayLength'] = (int) $options['pages']['display_length'];
 
   // Enable ThemeRoller support, if necessary.
-  if($options['layout']['themeroller']) {
+  if ($options['layout']['themeroller']) {
     $datatable_options['bJQueryUI'] = TRUE;
   }
 
@@ -294,6 +295,6 @@ function template_preprocess_datatables_view(&$vars) {
  */
 function _datatables_get_id() {
   static $datatable_id;
-  return 'datatable-'. ++$datatable_id;
+  return 'datatable-' . ++$datatable_id;
 }
 
