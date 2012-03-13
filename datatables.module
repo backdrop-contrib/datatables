@@ -152,17 +152,15 @@ function datatables_views_api() {
  * @see theme_table()
  */
 function theme_datatable($variables) {
-  $header = $variables['header'];
-  $rows = $variables['rows'];
-  $attributes = $variables['attributes'];
-  $caption = $variables['caption'];
+  $header     =& $variables['header'];
+  $attributes =&  $variables['attributes'];
 
-  if ($rows) {
+  if (isset($variables['rows'])) {
     $datatable_options = $attributes['datatable_options'];
 
     // Column settings can either be set with the global options
     // or in each header definition.
-    if (!$datatable_options['aoColumns']) {
+    if (!isset($datatable_options['aoColumns'])) {
       foreach ($header as $key => $cell) {
         $datatable_options['aoColumns'][] = $cell['datatable_options'];
         unset($header[$key]['datatable_options']);
@@ -170,7 +168,7 @@ function theme_datatable($variables) {
     }
 
     // Set unique id
-    if (!$attributes['id']) {
+    if (!isset($attributes['id'])) {
       $attributes['id'] = _datatables_get_id();
     }
 
@@ -179,7 +177,7 @@ function theme_datatable($variables) {
     unset($attributes['datatable_options']);
   }
 
-  return theme('table', $header, $rows, $attributes, $caption);
+  return theme('table', $variables);
 }
 
 /**
