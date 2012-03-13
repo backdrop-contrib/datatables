@@ -13,6 +13,7 @@ function datatables_requirements($phase) {
   $t = get_t();
 
   $requirements['datatables']['title'] = 'DataTables';
+  $requirements['datatables']['value'] = NULL;
   if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
     $requirements['datatables']['severity'] = REQUIREMENT_OK;
   }
