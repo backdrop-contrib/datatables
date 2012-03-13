@@ -207,13 +207,15 @@ function template_preprocess_datatables_view(&$vars) {
   foreach ($columns as $field => $column) {
     $column_options = NULL;
 
-    switch ($options['hidden_columns'][$field]) {
-      case 'expandable':
-        $datatable_options['bExpandable'] = TRUE;
-        // ... and fall through, since expandable columns are also hidden
-      case 'hidden':
-        // Hidden or expandable columns get the bVisible init option set to false
-        $column_options['bVisible'] = FALSE;
+    if (isset($options['hidden_columns'][$field])) {
+      switch ($options['hidden_columns'][$field]) {
+        case 'expandable':
+          $datatable_options['bExpandable'] = TRUE;
+          // ... and fall through, since expandable columns are also hidden
+        case 'hidden':
+          // Hidden or expandable columns get the bVisible init option set to false
+          $column_options['bVisible'] = FALSE;
+      }
     }
 
     // render the header labels
