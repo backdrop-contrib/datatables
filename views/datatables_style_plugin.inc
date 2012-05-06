@@ -10,6 +10,9 @@
  * @ingroup views_style_plugins
  */
 class datatables_style_plugin extends views_plugin_style_table {
+  /**
+   * Implements parent::option_definition().
+   */
   function option_definition() {
     $options = parent::option_definition();
 
@@ -21,22 +24,28 @@ class datatables_style_plugin extends views_plugin_style_table {
         'search_box' => TRUE,
         'table_info' => TRUE,
         'save_state' => FALSE,
-    ));
+      ),
+    );
     $options['layout'] = array(
       'default' => array(
         'autowidth' => FALSE,
         'themeroller' => FALSE,
         'sdom' => '',
-    ));
+      ),
+    );
     $options['pages'] = array(
       'default' => array(
         'pagination_style' => 0,
         'length_change' => 0,
         'display_length' => 10,
-    ));
+      ),
+    );
     return $options;
   }
 
+  /**
+   * Implements parent::options_form().
+   */
   function options_form(&$form, &$form_state) {
     parent::options_form($form, $form_state);
 
@@ -151,7 +160,11 @@ class datatables_style_plugin extends views_plugin_style_table {
         '#type' => 'select',
         '#title' => check_plain($column_label),
         '#default_value' => isset($this->options['hidden_columns'][$column_name]) ? $this->options['hidden_columns'][$column_name] : 0,
-        '#options' => array(0 => 'Visible', 'hidden' => 'Hidden', 'expandable' => 'Hidden and Expandable'),
+        '#options' => array(
+          0 => 'Visible',
+          'hidden' => 'Hidden',
+          'expandable' => 'Hidden and Expandable',
+        ),
       );
     }
   }
