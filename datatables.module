@@ -201,7 +201,7 @@ function theme_datatable($variables) {
   $attributes &= $variables['attributes'];
 
   if (isset($variables['rows'])) {
-    $datatable_options = $attributes['datatable_options'];
+    $datatable_options = !empty($attributes['datatable_options']) ? $attributes['datatable_options'] : array();
 
     // Column settings can either be set with the global options
     // or in each header definition.
