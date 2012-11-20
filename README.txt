@@ -25,7 +25,9 @@ For full documentation and examples, visit the DataTables jQuery plugin page:
 
 * Alternatively, if you are using the Libraries API module
   (http://drupal.org/project/libraries), you can place the dataTables folder in
-  sites/all/libraries/.  See http://drupal.org/node/1440066 for more information.
+  sites/all/libraries/ so final path is sites/all/libraries/datatables (note the
+  lower case directory name).  See http://drupal.org/node/1440066 for more
+  information.
 
 * Enable the module at Administer >> Site building >> Modules.
 
