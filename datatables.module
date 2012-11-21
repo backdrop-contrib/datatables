@@ -334,6 +334,7 @@ function template_preprocess_datatables_view(&$vars) {
   }
 
   $vars['id'] = _datatables_get_id();
+  $vars['classes_array'][] = 'display';
 
   drupal_add_library('datatables', 'datatables');
   drupal_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
