@@ -86,6 +86,12 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#default_value' => !empty($this->options['elements']['save_state']),
       '#description' => t("DataTables can use cookies in the end user's web-browser in order to store it's state after each change in drawing. What this means is that if the user were to reload the page, the table should remain exactly as it was (length, filtering, pagination and sorting)"),
     );
+    $form['elements']['table_tools'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Table Tools'),
+      '#default_value' => !empty($this->options['elements']['table_tools']),
+      '#description' => t('Table Tools is a plugin that adds a powerful button toolbar with copy, save, and print capabilities. See <a href="http://datatables.net/extras/tabletools/">TableTools Help</a> for more information.  Note that if you have custom sDom settings, TableTools can be included by inserting the "T" character.'),
+    );
 
     $form['layout'] = array(
       '#type' => 'fieldset',

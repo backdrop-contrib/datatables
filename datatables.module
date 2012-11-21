@@ -50,6 +50,22 @@ function datatables_library() {
         $lib_path . '/media/css/demo_table.css' => array(),
       ),
     );
+
+    $libraries['datatables-tabletools'] = array(
+      'title' => 'Tabletools plugin for DataTables',
+      'website' => 'http://www.datatables.net/extras/tabletools/',
+      'version' => '1.1.4',
+      'js' => array(
+        drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/js/ZeroClipboard.js' => array(),
+        drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/js/TableTools.js' => array(),
+      ),
+      'css' => array(
+        drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/css/TableTools.css' => array(),
+      ),
+      'dependencies' => array(
+        array('datatables', 'datatables'),
+      ),
+    );
   }
 
   return $libraries;
@@ -331,6 +347,21 @@ function template_preprocess_datatables_view(&$vars) {
       // Do nothing. No parameters need to be sent for the default (two-button)
       // style.
       break;
+  }
+
+  // Enable TableTools plugin support, if necessary.
+  if ($options['elements']['table_tools']) {
+    $datatable_options['oTableTools'] = array(
+      'sSwfPath' => base_path() . drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/swf/copy_csv_xls_pdf.swf',
+    );
+
+    // If a custom sDom is passed, assume that "T" is added, otherwise add it
+    // manually.
+    if (!$options['layout']['sdom']) {
+      $datatable_options['sDom'] = 'T<"clear">lfrtip';
+    }
+
+    drupal_add_library('datatables', 'datatables-tabletools');
   }
 
   $vars['id'] = _datatables_get_id();
