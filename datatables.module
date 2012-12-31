@@ -27,14 +27,7 @@ function datatables_theme() {
 function datatables_library() {
   $libraries = array();
 
-  // Locate the DataTables JS library (borrowed from install code).
-  $lib_path = NULL;
-  if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
-    $lib_path = drupal_get_path('module', 'datatables') . '/dataTables';
-  }
-  elseif (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
-    $lib_path = libraries_get_path('datatables');
-  }
+  $lib_path = _datatables_get_path();
 
   // Make sure we have a valid library path before returning library load info.
   if (!empty($lib_path)) {
@@ -56,11 +49,11 @@ function datatables_library() {
       'website' => 'http://www.datatables.net/extras/tabletools/',
       'version' => '1.1.4',
       'js' => array(
-        drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/js/ZeroClipboard.js' => array(),
-        drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/js/TableTools.js' => array(),
+        $lib_path . '/extras/TableTools/media/js/ZeroClipboard.js' => array(),
+        $lib_path . '/extras/TableTools/media/js/TableTools.js' => array(),
       ),
       'css' => array(
-        drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/css/TableTools.css' => array(),
+        $lib_path . '/extras/TableTools/media/css/TableTools.css' => array(),
       ),
       'dependencies' => array(
         array('datatables', 'datatables'),
@@ -331,7 +324,7 @@ function template_preprocess_datatables_view(&$vars) {
     $datatable_options['sDom'] = $options['layout']['sdom'];
   }
 
-    $datatable_options['bAutoWidth'] = $options['layout']['autowidth'];
+  $datatable_options['bAutoWidth'] = $options['layout']['autowidth'];
 
   // Enable full_numbers pagination if selected.
   switch ($options['pages']['pagination_style']) {
@@ -352,7 +345,7 @@ function template_preprocess_datatables_view(&$vars) {
   // Enable TableTools plugin support, if necessary.
   if ($options['elements']['table_tools']) {
     $datatable_options['oTableTools'] = array(
-      'sSwfPath' => base_path() . drupal_get_path('module', 'datatables') . '/dataTables/extras/TableTools/media/swf/copy_csv_xls_pdf.swf',
+      'sSwfPath' => base_path() . _datatables_get_path() . '/extras/TableTools/media/swf/copy_csv_xls_pdf.swf',
     );
 
     // If a custom sDom is passed, assume that "T" is added, otherwise add it
@@ -377,4 +370,20 @@ function template_preprocess_datatables_view(&$vars) {
 function _datatables_get_id() {
   static $datatable_id;
   return 'datatable-' . ++$datatable_id;
+}
+
+/**
+ * Returns path to datatables library.
+ */
+function _datatables_get_path() {
+  $lib_path = NULL;
+
+  if (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
+    $lib_path = libraries_get_path('datatables');
+  }
+  elseif (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
+    $lib_path = drupal_get_path('module', 'datatables') . '/dataTables';
+  }
+
+  return $lib_path;
 }
