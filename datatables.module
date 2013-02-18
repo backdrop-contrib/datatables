@@ -216,8 +216,10 @@ function theme_datatable($variables) {
     // or in each header definition.
     if (!isset($datatable_options['aoColumns'])) {
       foreach ($header as $key => $cell) {
-        $datatable_options['aoColumns'][] = $cell['datatable_options'];
-        unset($header[$key]['datatable_options']);
+        if (isset($cell['datatable_options'])) {
+          $datatable_options['aoColumns'][] = $cell['datatable_options'];
+          unset($header[$key]['datatable_options']);
+        }
       }
     }
 
