@@ -206,8 +206,8 @@ function datatables_views_api() {
  * @see theme_table()
  */
 function theme_datatable($variables) {
-  $header &= $variables['header'];
-  $attributes &= $variables['attributes'];
+  $header =& $variables['header'];
+  $attributes =& $variables['attributes'];
 
   if (isset($variables['rows'])) {
     $datatable_options = !empty($attributes['datatable_options']) ? $attributes['datatable_options'] : array();
