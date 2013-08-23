@@ -218,7 +218,9 @@ function theme_datatable($variables) {
       foreach ($header as $key => $cell) {
         if (isset($cell['datatable_options'])) {
           $datatable_options['aoColumns'][] = $cell['datatable_options'];
-          unset($header[$key]['datatable_options']);
+          if (is_array($header[$key])) {
+            unset($header[$key]['datatable_options']);
+          }
         }
       }
     }
