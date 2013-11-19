@@ -361,6 +361,29 @@ function template_preprocess_datatables_view(&$vars) {
     drupal_add_library('datatables', 'datatables-tabletools');
   }
 
+  $datatable_options['oLanguage'] = array(
+    'sEmptyTable' => t('No data available in table'),
+    'sInfo' => t('Start !_START_ to !_END_ of !_TOTAL_ entries', array('!_START_' => '_START_', '!_END_' => '_END_', '!_TOTAL_' => '_TOTAL_')),
+    'sInfoEmpty' => t('Showing 0 to 0 of 0 entries'),
+    'sInfoFiltered' => t('(filtered from !_MAX_ total entries)', array('!_MAX_' => '_MAX_')),
+    'sInfoPostFix' => '',
+    'sProcessing' => t('Processing...'),
+    'sLengthMenu' => t('Show !_MENU_ entries', array('!_MENU_' => '_MENU_')),
+    'sLoadingRecords' => t('Loading...'),
+    'sZeroRecords' => t( 'No matching records found'),
+    'sSearch' => t('Search'),
+    'oPaginate' => array(
+        'sFirst' => t( 'First'),
+        'sPrevious' => t('Previous'),
+        'sNext' => t('Next'),
+        'sLast' => t('Last'),
+    ),
+    'oAria' => array(
+      'sSortAscending' => t(': activate to sort column ascending'),
+      'sSortDescending' => t(': activate to sort column descending'),
+    ),
+  );
+
   $vars['id'] = _datatables_get_id();
   $vars['classes_array'][] = 'display';
 
