@@ -40,6 +40,9 @@ class datatables_style_plugin extends views_plugin_style_table {
         'display_length' => 10,
       ),
     );
+    $options['hidden_columns'] = array(
+      'default' => array(),
+    );
     return $options;
   }
 
