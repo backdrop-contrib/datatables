@@ -303,6 +303,7 @@ function template_preprocess_datatables_view(&$vars) {
     }
 
     // Set default sort order.
+    $datatable_options['aaSorting'] = array();
     if ($options['default'] == $field) {
       $datatable_options['aaSorting'] = array(array($position, $options['order']));
     }
