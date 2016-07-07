@@ -9,7 +9,7 @@
             // Insert a "view more" column to the table.
             var nCloneTh = document.createElement('th');
             var nCloneTd = document.createElement('td');
-            nCloneTd.innerHTML = '<a href="#" class="datatables-expand datatables-closed">Show Details</a>';
+            nCloneTd.innerHTML = '<a href="#" class="datatables-expand datatables-closed">' + Drupal.t('Show Details') + '</a>';
 
             $(selector + ' thead tr').each( function () {
               this.insertBefore( nCloneTh, this.childNodes[0] );
@@ -41,11 +41,11 @@
                 var row = this.parentNode.parentNode;
                 if (datatable.fnIsOpen(row)) {
                   datatable.fnClose(row);
-                  $(this).html('Show Details');
+                  $(this).html(Drupal.t('Show Details'));
                 }
                 else {
                   datatable.fnOpen( row, Drupal.theme('datatablesExpandableRow', datatable, row), 'details' );
-                  $(this).html('Hide Details');
+                  $(this).html(Drupal.t('Hide Details'));
                 }
                 return false;
               });
