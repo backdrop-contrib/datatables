@@ -1,13 +1,7 @@
 name = DataTables
-description = Provides integration of the jquery DataTables plugin into views.
-version = 7.x-0.1
+description = Provides integration of the DataTables library into Views.
 backdrop = 1.x
 type = module
 package = Views
 dependencies[] = views
 
-files[] = datatables.install
-files[] = datatables.module
-files[] = views/datatables-view.tpl.php
-files[] = views/datatables.views.inc
-files[] = views/datatables_style_plugin.inc
