@@ -22,38 +22,46 @@ function datatables_theme() {
 }
 
 /**
- * Implements hook_library().
+ * Implements hook_library_info().
  */
 function datatables_library_info() {
   $libraries = array();
 
-  $lib_path = _datatables_get_path();
+  $lib_path = backdrop_get_path('module', 'datatables') . '/DataTables';
 
   // Make sure we have a valid library path before returning library load info.
   if (!empty($lib_path)) {
     $libraries['datatables'] = array(
       'title' => 'DataTables',
-      'website' => 'http://http://datatables.net/',
-      'version' => '1.9',
+      'website' => 'https://datatables.net/',
+      'version' => '2.0.5',
       'js' => array(
-        $lib_path . '/media/js/jquery.dataTables.js' => array(),
+        $lib_path . '/dataTables.min.js' => array(),
         backdrop_get_path('module', 'datatables') . '/js/datatables.js' => array(),
+        $lib_path . '/dataTables.responsive.min.js' => array(),
+//        $lib_path . '/responsive.dataTables.js' => array(), // why???
       ),
       'css' => array(
-        $lib_path . '/media/css/demo_table.css' => array(),
+        $lib_path . '/dataTables.dataTables.min.css' => array(),
+        $lib_path . '/responsive.dataTables.min.css' => array(),
       ),
     );
 
-    $libraries['datatables-tabletools'] = array(
-      'title' => 'Tabletools plugin for DataTables',
-      'website' => 'http://www.datatables.net/extras/tabletools/',
-      'version' => '1.1.4',
+    $libraries['datatables-buttons'] = array(
+      'title' => 'Buttons (successor of Tabletools) plugin for DataTables',
+      'website' => 'https://datatables.net/extensions/buttons',
+      'version' => '3.0.2',
       'js' => array(
-        $lib_path . '/extras/TableTools/media/js/ZeroClipboard.js' => array(),
-        $lib_path . '/extras/TableTools/media/js/TableTools.js' => array(),
+        $lib_path . '/dataTables.buttons.js' => array(),
+        $lib_path . '/buttons.colVis.js' => array(),
+        $lib_path . '/buttons.html5.js' => array(), // Copy button
+        $lib_path . '/buttons.print.js' => array(), // Print button
+        $lib_path . '/jszip.js' => array(), // Excel Export button
+        $lib_path . '/pdfmake.js' => array(), // PDF Export button
+        $lib_path . '/vfs_fonts.js' => array(), // PDF Export button
       ),
       'css' => array(
-        $lib_path . '/extras/TableTools/media/css/TableTools.css' => array(),
+        $lib_path . '/buttons.dataTables.min.css' => array(),
       ),
       'dependencies' => array(
         array('datatables', 'datatables'),
@@ -398,22 +406,6 @@ function template_preprocess_datatables_view(&$vars) {
 function _datatables_get_id() {
   static $datatable_id;
   return 'datatable-' . ++$datatable_id;
-}
-
-/**
- * Returns path to datatables library.
- */
-function _datatables_get_path() {
-  $lib_path = NULL;
-
-  if (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
-    $lib_path = libraries_get_path('datatables');
-  }
-  elseif (file_exists(backdrop_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
-    $lib_path = backdrop_get_path('module', 'datatables') . '/dataTables';
-  }
-
-  return $lib_path;
 }
 
 /**
