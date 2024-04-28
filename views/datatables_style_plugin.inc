@@ -87,13 +87,13 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#type' => 'checkbox',
       '#title' => t('Save State'),
       '#default_value' => !empty($this->options['elements']['save_state']),
-      '#description' => t("DataTables can use cookies in the end user's web-browser in order to store it's state after each change in drawing. What this means is that if the user were to reload the page, the table should remain exactly as it was (length, filtering, pagination and sorting)"),
+      '#description' => t("DataTables can use HTML5 localStorage and sessionStorage APIs in the end user's web-browser in order to store it's state after each change in drawing. What this means is that if the user were to reload the page, the table should remain exactly as it was (length, filtering, pagination and sorting)"),
     );
     $form['elements']['table_tools'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Table Tools'),
+      '#title' => t('Buttons'),
       '#default_value' => !empty($this->options['elements']['table_tools']),
-      '#description' => t('Table Tools is a plugin that adds a powerful button toolbar with copy, save, and print capabilities. See <a href="http://datatables.net/extras/tabletools/">TableTools Help</a> for more information.  Note that if you have custom sDom settings, TableTools can be included by inserting the "T" character.'),
+      '#description' => t('Buttons (successor of Table Tools) is a plugin that adds a powerful button toolbar with copy, save, and print capabilities. Note that if you have custom dom parameter set, Buttons can be included by inserting the "B" character.'),
     );
 
     $form['layout'] = array(
@@ -112,16 +112,16 @@ class datatables_style_plugin extends views_plugin_style_table {
 
     $form['layout']['themeroller'] = array(
       '#type' => 'checkbox',
-      '#title' => t('Enable jQuery UI ThemeRoller Support'),
+      '#title' => t('Enable jQuery UI ThemeRoller Support (Deprecated)'),
       '#default_value' => !empty($this->options['layout']['themeroller']),
       '#description' => t("Create markup and classes to support jQuery UI's ThemeRoller"),
     );
 
     $form['layout']['sdom'] = array(
       '#type' => 'textfield',
-      '#title' => t('Set sDOM Initialization Parameter'),
+      '#title' => t('Set dom Initialization Parameter (Deprecated)'),
       '#default_value' => $this->options['layout']['sdom'],
-      '#description' => t("Use the sDOM parameter to rearrange the interface elements. See the <a href='@sdom_documentation_url'>Datatables sDOM documentation</a> for details on how to use this feature", array('@sdom_documentation_url' => 'http://www.datatables.net/examples/basic_init/dom.html')),
+      '#description' => t("Use the dom parameter to rearrange the interface elements. See the <a href='@sdom_documentation_url'>Datatables dom documentation</a> for details on how to use this feature", array('@sdom_documentation_url' => 'https://datatables.net/reference/option/dom')),
     );
 
     $form['pages'] = array(
@@ -135,7 +135,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Pagination Style'),
       '#default_value' => isset($this->options['pages']['pagination_style']) ? $this->options['pages']['pagination_style'] : 0,
       '#options' => array(
-        0 => t('Two-Button (Default)'),
+        0 => t('Simple Numbers (Default)'),
         'full_numbers' => t('Full Numbers'),
         'no_pagination' => t('No Pagination'),
       ),

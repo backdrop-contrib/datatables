@@ -5,8 +5,13 @@
         $(selector, context).once('datatables', function() {
           // Check if table contains expandable hidden rows.
           var settings = Backdrop.settings.datatables[selector];
-          if (settings.bExpandable) {
+/*
+          if (settings.expandable) {
             // Insert a "view more" column to the table.
+            settings.responsive = { details: { type: 'column' } };
+            settings.columns.unshift({title: '', data: false, defaultContent: '', className: 'dt-control', orderable: false, visible: true});
+            settings.order.idx = settings.order.idx + 1;
+
             var nCloneTh = document.createElement('th');
             var nCloneTd = document.createElement('td');
             nCloneTd.innerHTML = '<a href="#" class="datatables-expand datatables-closed">' + Backdrop.t('Show Details') + '</a>';
@@ -18,65 +23,22 @@
             $(selector + ' tbody tr').each( function () {
               this.insertBefore(  nCloneTd.cloneNode( true ), this.childNodes[0] );
             });
-
-            settings.aoColumns.unshift({"bSortable": false});
           }
-
-          var datatable = $.fn.dataTable.fnIsDataTable(selector) ? $(selector) : $(selector).dataTable(settings);
-
-          if (settings.bExpandable) {
-            // Add column headers to table settings.
-            var datatables_settings = datatable.fnSettings();
-            // Add blank column header for show details column.
-            settings.aoColumnHeaders.unshift('');
-            // Add column headers to table settings.
-            datatables_settings.aoColumnHeaders = settings.aoColumnHeaders;
-
-            /* Add event listener for opening and closing details
-            * Note that the indicator for showing which row is open is not controlled by DataTables,
-            * rather it is done here
-            */
-            $('td a.datatables-expand', datatable.fnGetNodes() ).each( function () {
-              $(this).click( function () {
-                var row = this.parentNode.parentNode;
-                if (datatable.fnIsOpen(row)) {
-                  datatable.fnClose(row);
-                  $(this).html(Backdrop.t('Show Details'));
+*/
+          settings.responsive = true;
+/*          settings.responsive = { details: {
+            display: DataTable.Responsive.display.modal({
+                header: function (row) {
+                    var data = row.data();
+                    return 'Details for ' + data[0] + ' ' + data[1];
                 }
-                else {
-                  datatable.fnOpen( row, Backdrop.theme('datatablesExpandableRow', datatable, row), 'details' );
-                  $(this).html(Backdrop.t('Hide Details'));
-                }
-                return false;
-              });
-            });
-          }
+            }),
+            renderer: DataTable.Responsive.renderer.tableAll()
+          } };
+*/
+          var table = $(selector).DataTable(settings);
         });
       });
     }
-  };
-
-  /**
-  * Theme an expandable hidden row.
-  *
-  * @param object
-  *   The datatable object.
-  * @param array
-  *   The row array for which the hidden row is being displayed.
-  * @return
-  *   The formatted text (html).
-  */
-  Backdrop.theme.prototype.datatablesExpandableRow = function(datatable, row) {
-    var rowData = datatable.fnGetData(row);
-    var settings = datatable.fnSettings();
-
-    var output = '<table style="padding-left: 50px">';
-    $.each(rowData, function(index) {
-      if (!settings.aoColumns[index].bVisible) {
-        output += '<tr><td>' + settings.aoColumnHeaders[index] + '</td><td style="text-align: left">' + this + '</td></tr>';
-      }
-    });
-    output += '</table>';
-    return output;
   };
 })(jQuery);

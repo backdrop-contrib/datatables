@@ -95,16 +95,16 @@ function datatables_views_api() {
  * For example:
  * @code
  *   $parameters['datatables_options'] = array(
- *     'bFilter'   => FALSE,  // Disable filtering of data.
- *     'bInfo'     => TRUE,   // Show the table information display.
- *     'aaSorting' => array(  // Sort by 3rd column first, and then 4th column.
+ *     'filter'   => FALSE,  // Disable filtering of data.
+ *     'info'     => TRUE,   // Show the table information display.
+ *     'order' => array(  // Sort by 3rd column first, and then 4th column.
  *        array(2, 'asc'),
  *        array(3, 'desc'),
  *      ),
  *   );
  * @endcode
- * See http://datatables.net/usage/features and
- * http://datatables.net/usage/options for a full list of features and options.
+ * See https://datatables.net/reference/feature/ and
+ * https://datatables.net/reference/option/ for a full list of features and options.
  *
  * To enable column specific options, set the datatable_options for each of the
  * columns in the $header parameter.
@@ -114,21 +114,21 @@ function datatables_views_api() {
  *     array(
  *       'data' => t('Column 1'),
  *       'datatable_options' => array(
- *        'bSortable' => TRUE,  // Enable sorting on this column.
+ *        'orderable' => TRUE,  // Enable sorting on this column.
  *       ),
  *     ),
  *     array(
  *       'data' => t('Column 2'),
  *       'datatable_options' => array(
- *         'bSearchable' => FALSE, // Disable filtering on this column.
+ *         'searchable' => FALSE, // Disable filtering on this column.
  *       ),
  *     ),
  *   );
  * @endcode
- * Note: if the aaColumns option is enabled in $parameters['datatable_options'],
+ * Note: if the columns option is enabled in $parameters['datatable_options'],
  * then all datatable_options in the $header parameter will be ignored, since
  * the parameters will override column options.  See
- * http://datatables.net/usage/columns for a full list of column options.
+ * https://datatables.net/reference/option/ for a full list of column options.
  *
  * @param array $variables
  *   An associative array containing:
@@ -222,10 +222,10 @@ function theme_datatable($variables) {
 
     // Column settings can either be set with the global options
     // or in each header definition.
-    if (!isset($datatable_options['aoColumns'])) {
+    if (!isset($datatable_options['columns'])) {
       foreach ($header as $key => $cell) {
         if (isset($cell['datatable_options'])) {
-          $datatable_options['aoColumns'][] = $cell['datatable_options'];
+          $datatable_options['columns'][] = $cell['datatable_options'];
           if (is_array($header[$key])) {
             unset($header[$key]['datatable_options']);
           }
@@ -274,12 +274,17 @@ function template_preprocess_datatables_view(&$vars) {
     if (isset($options['hidden_columns'][$field])) {
       switch ($options['hidden_columns'][$field]) {
         case 'expandable':
-          $datatable_options['bExpandable'] = TRUE;
-          // ... and fall through, since expandable columns are also hidden.
+          $datatable_options['expandable'] = TRUE;
+          // expandable columns are not hidden, but use the class 'none'
+          $column_options['className'] = 'none';
+          break;
         case 'hidden':
-          // Hidden or expandable columns get the bVisible init option set to
+          // Hidden or expandable columns get the visible init option set to
           // false.
-          $column_options['bVisible'] = FALSE;
+          $column_options['visible'] = FALSE;
+#          break;
+#        default:
+#          $column_options['visible'] = TRUE;
       }
     }
 
@@ -288,113 +293,134 @@ function template_preprocess_datatables_view(&$vars) {
       // Overrides clicksort head defined in
       // template_preprocess_views_view_table().
       $vars['header'][$field] = check_plain(!empty($fields[$field]) ? $fields[$field]->label() : '');
+      $column_options['title'] = $vars['header'][$field];
 
       if (empty($options['info'][$field]['sortable']) || !$fields[$field]->click_sortable()) {
-        $column_options['bSortable'] = FALSE;
+        $column_options['orderable'] = FALSE;
       }
       else {
         // Attempt to autodetect the type of field in order to handle sorting
         // correctly.
         if (backdrop_strlen($fields[$field]->last_render) != backdrop_strlen(strip_tags($fields[$field]->last_render))) {
-          $column_options['sType'] = 'html';
+          $column_options['type'] = 'html';
         }
-        elseif (is_numeric($fields[$field]->last_render)) {
-          $column_options['sType'] = 'numeric';
+        elseif (is_numeric($fields[$field]->last_render) || $fields[$field] instanceof views_handler_field_numeric) {
+#not good          $column_options['type'] = 'num-fmt';
         }
-        elseif ($fields[$field] instanceof views_handler_field_date) {
-          $column_options['sType'] = 'date';
+        elseif ($fields[$field] instanceof views_handler_field_date || $fields[$field] instanceof views_handler_field_datetime) {
+          $column_options['type'] = 'date';
+#          backdrop_add_library('datatables', 'datatables-moment');
+#          backdrop_add_js("DataTable.datetime( 'DD.MM.YYYY HH:mm' );", array('type' => 'inline', 'scope' => 'footer'));
         }
-        $column_options['bSortable'] = TRUE;
+        $column_options['orderable'] = TRUE;
       }
-      $datatable_options['aoColumns'][] = $column_options;
-      $datatable_options['aoColumnHeaders'][] = $vars['header'][$field];
-    }
+      $datatable_options['columns'][] = $column_options;
 
-    // Set default sort order.
-    $datatable_options['aaSorting'] = array();
-    if ($options['default'] == $field) {
-      $datatable_options['aaSorting'] = array(array($position, $options['order']));
+      // Set default sort order.
+      if ($options['default'] == $field) {
+        $datatable_options['order'] = [
+          'idx' => $position,
+          'dir' => $options['info'][$field]['default_sort_order']
+        ];
+      }
+      $position++;
     }
-
-    $position++;
   }
 
-  // Enable table info display, if necessary.
-  $datatable_options['bInfo'] = $options['elements']['table_info'];
-  $datatable_options['bFilter'] = $options['elements']['search_box'];
-  $datatable_options['bStateSave'] = $options['elements']['save_state'];
+  // Enable table info display and other options, if necessary.
+  $datatable_options['info'] = $options['elements']['table_info'];
+  $datatable_options['searching'] = $options['elements']['search_box'];
+  $datatable_options['stateSave'] = $options['elements']['save_state'];
 
-  $datatable_options['bLengthChange'] = $options['pages']['length_change'];
-  $datatable_options['iDisplayLength'] = (int) $options['pages']['display_length'];
+  $datatable_options['lengthChange'] = $options['pages']['length_change'];
+  $datatable_options['pageLength'] = (int) $options['pages']['display_length'];
 
   // Enable ThemeRoller support, if necessary.
   if ($options['layout']['themeroller']) {
-    $datatable_options['bJQueryUI'] = TRUE;
+    $datatable_options['jQueryUI'] = TRUE;
   }
 
   // Pass the sDOM parameter, if one is specified.
+  // Keep sdom config name for backwards compatibility with Drupal/DataTables1.x.
   if ($options['layout']['sdom']) {
-    $datatable_options['sDom'] = $options['layout']['sdom'];
+    $datatable_options['dom'] = $options['layout']['sdom'];
   }
 
-  $datatable_options['bAutoWidth'] = $options['layout']['autowidth'];
+  $datatable_options['autoWidth'] = $options['layout']['autowidth'];
 
   // Enable full_numbers pagination if selected.
   switch ($options['pages']['pagination_style']) {
     case 'full_numbers':
-      $datatable_options['sPaginationType'] = 'full_numbers';
+      $datatable_options['pagingType'] = 'full_numbers';
       break;
 
     case 'no_pagination':
-      $datatable_options['bPaginate'] = FALSE;
+      $datatable_options['paging'] = FALSE;
       break;
 
     default:
-      // Do nothing. No parameters need to be sent for the default (two-button)
-      // style.
+      // Do nothing. No parameters need to be sent for the default (simple
+      // numbers) style.
       break;
   }
 
-  // Enable TableTools plugin support, if necessary.
-  if ($options['elements']['table_tools']) {
-    $datatable_options['oTableTools'] = array(
-      'sSwfPath' => base_path() . _datatables_get_path() . '/extras/TableTools/media/swf/copy_csv_xls_pdf.swf',
-    );
+  // Enable Buttons (successor of TableTools) plugin support, if necessary.
+  if (!empty($options['elements']['table_tools'])) {
+    $datatable_options['buttons'] = [
+      ['extend' => 'colvis', 'text' => 'Columns', 'titleAttr' => 'Show/hide columns'],
+      ['extend' => 'collection', 'text' => 'Export', 'titleAttr' => 'Export data of the table into various formats', 'buttons' => ['copy', 'csv', 'excel', 'pdf', 'print']],
+    ];
 
-    // If a custom sDom is passed, assume that "T" is added, otherwise add it
-    // manually.
-    if (!$options['layout']['sdom']) {
-      $datatable_options['sDom'] = 'T<"clear">lfrtip';
+    if ($datatable_options['lengthChange']) {
+      $datatable_options['buttons'][] = ['extend' => 'pageLength', 'text' => 'Rows', 'titleAttr' => 'Select number of rows shown per page'];
     }
 
-    backdrop_add_library('datatables', 'datatables-tabletools');
+    // If a custom dom parameter is passed, assume that "B" is added, otherwise
+    // add it manually.
+    if (!$options['layout']['sdom']) {
+      $datatable_options['dom'] = '<"dt-layout-row"<"dt-layout-cell dt-start"f><"dt-layout-cell dt-end"B>>
+        <"dt-layout-row dt-layout-table"rt>
+        <"dt-layout-row"<"dt-layout-cell dt-start"i><"dt-layout-cell dt-end"p>>';
+    }
+    backdrop_add_library('datatables', 'datatables-buttons');
   }
 
-  $datatable_options['oLanguage'] = array(
-    'sEmptyTable' => t('No data available in table'),
-    'sInfo' => t('Start !_START_ to !_END_ of !_TOTAL_ entries', array('!_START_' => '_START_', '!_END_' => '_END_', '!_TOTAL_' => '_TOTAL_')),
-    'sInfoEmpty' => t('Showing 0 to 0 of 0 entries'),
-    'sInfoFiltered' => t('(filtered from !_MAX_ total entries)', array('!_MAX_' => '_MAX_')),
-    'sInfoPostFix' => '',
-    'sProcessing' => t('Processing...'),
-    'sLengthMenu' => t('Show !_MENU_ entries', array('!_MENU_' => '_MENU_')),
-    'sLoadingRecords' => t('Loading...'),
-    'sZeroRecords' => t( 'No matching records found'),
-    'sSearch' => t('Search'),
-    'oPaginate' => array(
-      'sFirst' => t( 'First'),
-      'sPrevious' => t('Previous'),
-      'sNext' => t('Next'),
-      'sLast' => t('Last'),
+  // Note: a nice overview of text options, but this is not needed
+  $datatable_options['language'] = array(
+    'emptyTable' => t('No data available in table'),
+    'info' => t('Showing !_START_ to !_END_ of !_TOTAL_ entries', array('!_START_' => '_START_', '!_END_' => '_END_', '!_TOTAL_' => '_TOTAL_')),
+    'infoEmpty' => t('Showing 0 to 0 of 0 entries'),
+    'infoFiltered' => t('(filtered from !_MAX_ total entries)', array('!_MAX_' => '_MAX_')),
+    'infoPostFix' => '',
+    'processing' => t('Processing...'),
+    'lengthMenu' => t('Show !_MENU_ entries', array('!_MENU_' => '_MENU_')),
+    'loadingRecords' => t('Loading...'),
+    'zeroRecords' => t( 'No matching records found'),
+    'search' => t('Search'),
+    'paginate' => array(
+      'first' => t( 'First'),
+      'previous' => t('Previous'),
+      'next' => t('Next'),
+      'last' => t('Last'),
     ),
-    'oAria' => array(
-      'sSortAscending' => t(': activate to sort column ascending'),
-      'sSortDescending' => t(': activate to sort column descending'),
+    'aria' => array(
+      'orderable' => t(': activate to order by this column'),
+      'orderableReverse' => t(': activate to order by this column'),
     ),
   );
 
+/* We do this in Javascript later
+  if ($datatable_options['expandable']) {
+    $datatable_options['responsive'] = ['details' => ['type' => 'column']];
+    $details_column_options = ['title' => '', 'data' => false, 'defaultContent' => '', 'className' => 'dt-control', 'orderable' => false, 'visible' => true];
+    array_unshift($datatable_options['columns'], $details_column_options);
+    $datatable_options['order']['idx']++;
+  }
+*/
+
   $vars['id'] = _datatables_get_id();
-  $vars['classes_array'][] = 'display';
+  $vars['classes'][] = 'display';
+  $vars['classes'][] = 'nowrap';  // recommended for responsive tables
 
   backdrop_add_library('datatables', 'datatables');
   backdrop_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
