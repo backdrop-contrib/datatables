@@ -13,7 +13,7 @@
  *   $rows are keyed by row number, fields within rows are keyed by field ID.
  */
 ?>
-<table id="<?php print $id ?>" class="<?php print $classes; ?>"<?php print $attributes; ?>>
+<table id="<?php print $id ?>" class="<?php print implode(' ', $classes); ?>"<?php print backdrop_attributes($attributes); ?>>
   <?php if (!empty($title)) : ?>
     <caption><?php print $title; ?></caption>
   <?php endif; ?>
