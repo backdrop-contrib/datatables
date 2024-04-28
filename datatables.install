@@ -16,7 +16,7 @@ function datatables_requirements($phase) {
 
     $requirements['datatables']['title'] = 'DataTables';
     $requirements['datatables']['value'] = NULL;
-    if (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
+    if (file_exists(backdrop_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
       $requirements['datatables']['severity'] = REQUIREMENT_OK;
     }
     elseif (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
@@ -29,8 +29,8 @@ function datatables_requirements($phase) {
       $requirements['datatables']['description'] = $t('The <a href="!datatables">DataTables</a> plugin is missing. <a href="!download">Download</a> and extract it to your <em>datatables</em> module directory. See <a href="!readme">README.txt</a> for more info.', array(
         '!datatables' => 'http://datatables.net/',
         '!download' => 'http://datatables.net/releases/DataTables-1.9.0.zip',
-        '!readme' => 'http://drupalcode.org/project/datatables.git/blob_plain/refs/heads/7.x-1.x:/README.txt'
-        )
+        '!readme' => 'http://backdropcode.org/project/datatables.git/blob_plain/refs/heads/7.x-1.x:/README.txt',
+      )
       );
       $requirements['datatables']['severity'] = REQUIREMENT_ERROR;
     }

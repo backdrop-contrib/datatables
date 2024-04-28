@@ -1,7 +1,8 @@
 name = DataTables
 description = Provides integration of the jquery DataTables plugin into views.
 version = 7.x-0.1
-core = 7.x
+backdrop = 1.x
+type = module
 package = Views
 dependencies[] = views
 

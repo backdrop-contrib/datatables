@@ -1,15 +1,15 @@
 (function ($) {
-  Drupal.behaviors.datatables = {
+  Backdrop.behaviors.datatables = {
     attach: function (context, settings) {
       $.each(settings.datatables, function (selector) {
         $(selector, context).once('datatables', function() {
           // Check if table contains expandable hidden rows.
-          var settings = Drupal.settings.datatables[selector];
+          var settings = Backdrop.settings.datatables[selector];
           if (settings.bExpandable) {
             // Insert a "view more" column to the table.
             var nCloneTh = document.createElement('th');
             var nCloneTd = document.createElement('td');
-            nCloneTd.innerHTML = '<a href="#" class="datatables-expand datatables-closed">' + Drupal.t('Show Details') + '</a>';
+            nCloneTd.innerHTML = '<a href="#" class="datatables-expand datatables-closed">' + Backdrop.t('Show Details') + '</a>';
 
             $(selector + ' thead tr').each( function () {
               this.insertBefore( nCloneTh, this.childNodes[0] );
@@ -41,11 +41,11 @@
                 var row = this.parentNode.parentNode;
                 if (datatable.fnIsOpen(row)) {
                   datatable.fnClose(row);
-                  $(this).html(Drupal.t('Show Details'));
+                  $(this).html(Backdrop.t('Show Details'));
                 }
                 else {
-                  datatable.fnOpen( row, Drupal.theme('datatablesExpandableRow', datatable, row), 'details' );
-                  $(this).html(Drupal.t('Hide Details'));
+                  datatable.fnOpen( row, Backdrop.theme('datatablesExpandableRow', datatable, row), 'details' );
+                  $(this).html(Backdrop.t('Hide Details'));
                 }
                 return false;
               });
@@ -66,7 +66,7 @@
   * @return
   *   The formatted text (html).
   */
-  Drupal.theme.prototype.datatablesExpandableRow = function(datatable, row) {
+  Backdrop.theme.prototype.datatablesExpandableRow = function(datatable, row) {
     var rowData = datatable.fnGetData(row);
     var settings = datatable.fnSettings();
 

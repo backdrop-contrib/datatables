@@ -24,7 +24,7 @@ function datatables_theme() {
 /**
  * Implements hook_library().
  */
-function datatables_library() {
+function datatables_library_info() {
   $libraries = array();
 
   $lib_path = _datatables_get_path();
@@ -37,7 +37,7 @@ function datatables_library() {
       'version' => '1.9',
       'js' => array(
         $lib_path . '/media/js/jquery.dataTables.js' => array(),
-        drupal_get_path('module', 'datatables') . '/js/datatables.js' => array(),
+        backdrop_get_path('module', 'datatables') . '/js/datatables.js' => array(),
       ),
       'css' => array(
         $lib_path . '/media/css/demo_table.css' => array(),
@@ -70,7 +70,7 @@ function datatables_library() {
 function datatables_views_api() {
   return array(
     'api' => 3.0,
-    'path' => drupal_get_path('module', 'datatables') . '/views',
+    'path' => backdrop_get_path('module', 'datatables') . '/views',
   );
 }
 
@@ -206,8 +206,8 @@ function datatables_views_api() {
  * @see theme_table()
  */
 function theme_datatable($variables) {
-  $header =& $variables['header'];
-  $attributes =& $variables['attributes'];
+  $header = &$variables['header'];
+  $attributes = &$variables['attributes'];
 
   if (isset($variables['rows'])) {
     $datatable_options = !empty($attributes['datatable_options']) ? $attributes['datatable_options'] : array();
@@ -230,8 +230,8 @@ function theme_datatable($variables) {
       $attributes['id'] = _datatables_get_id();
     }
 
-    drupal_add_library('datatables', 'datatables');
-    drupal_add_js(array('datatables' => array('#' . $attributes['id'] => $datatable_options)), 'setting');
+    backdrop_add_library('datatables', 'datatables');
+    backdrop_add_js(array('datatables' => array('#' . $attributes['id'] => $datatable_options)), 'setting');
     unset($attributes['datatable_options']);
   }
 
@@ -287,7 +287,7 @@ function template_preprocess_datatables_view(&$vars) {
       else {
         // Attempt to autodetect the type of field in order to handle sorting
         // correctly.
-        if (drupal_strlen($fields[$field]->last_render) != drupal_strlen(strip_tags($fields[$field]->last_render))) {
+        if (backdrop_strlen($fields[$field]->last_render) != backdrop_strlen(strip_tags($fields[$field]->last_render))) {
           $column_options['sType'] = 'html';
         }
         elseif (is_numeric($fields[$field]->last_render)) {
@@ -359,7 +359,7 @@ function template_preprocess_datatables_view(&$vars) {
       $datatable_options['sDom'] = 'T<"clear">lfrtip';
     }
 
-    drupal_add_library('datatables', 'datatables-tabletools');
+    backdrop_add_library('datatables', 'datatables-tabletools');
   }
 
   $datatable_options['oLanguage'] = array(
@@ -374,10 +374,10 @@ function template_preprocess_datatables_view(&$vars) {
     'sZeroRecords' => t( 'No matching records found'),
     'sSearch' => t('Search'),
     'oPaginate' => array(
-        'sFirst' => t( 'First'),
-        'sPrevious' => t('Previous'),
-        'sNext' => t('Next'),
-        'sLast' => t('Last'),
+      'sFirst' => t( 'First'),
+      'sPrevious' => t('Previous'),
+      'sNext' => t('Next'),
+      'sLast' => t('Last'),
     ),
     'oAria' => array(
       'sSortAscending' => t(': activate to sort column ascending'),
@@ -388,8 +388,8 @@ function template_preprocess_datatables_view(&$vars) {
   $vars['id'] = _datatables_get_id();
   $vars['classes_array'][] = 'display';
 
-  drupal_add_library('datatables', 'datatables');
-  drupal_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
+  backdrop_add_library('datatables', 'datatables');
+  backdrop_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
 }
 
 /**
@@ -409,9 +409,18 @@ function _datatables_get_path() {
   if (module_exists('libraries') && file_exists(libraries_get_path('datatables') . '/media/js/jquery.dataTables.js')) {
     $lib_path = libraries_get_path('datatables');
   }
-  elseif (file_exists(drupal_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
-    $lib_path = drupal_get_path('module', 'datatables') . '/dataTables';
+  elseif (file_exists(backdrop_get_path('module', 'datatables') . '/dataTables/media/js/jquery.dataTables.js')) {
+    $lib_path = backdrop_get_path('module', 'datatables') . '/dataTables';
   }
 
   return $lib_path;
+}
+
+/**
+ * Implements hook_autoload_info().
+ */
+function datatables_autoload_info() {
+  return array(
+    'datatables_style_plugin' => 'views/datatables_style_plugin.inc',
+  );
 }
