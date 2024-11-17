@@ -94,7 +94,7 @@ function datatables_views_api() {
  * $parameters['datatable_options'] as an associative array.
  * For example:
  * @code
- *   $parameters['datatables_options'] = array(
+ *   $parameters['datatable_options'] = array(
  *     'filter'   => FALSE,  // Disable filtering of data.
  *     'info'     => TRUE,   // Show the table information display.
  *     'order' => array(  // Sort by 3rd column first, and then 4th column.
@@ -102,6 +102,11 @@ function datatables_views_api() {
  *        array(3, 'desc'),
  *      ),
  *   );
+ * @endcode
+ * 
+ * Then, these parameters must be passed to the theming function under the `attributes` key, as in:
+ * @code
+ *   $output = theme('datatable', array('header' => $header, 'rows' => $rows, 'attributes' => $parameters));
  * @endcode
  * See https://datatables.net/reference/feature/ and
  * https://datatables.net/reference/option/ for a full list of features and options.
@@ -168,7 +173,8 @@ function datatables_views_api() {
  *       )
  *     );
  *     @endcode
- *   - attributes: An array of HTML attributes to apply to the table tag.
+ *   - attributes: An array of HTML attributes to apply to the table tag. Use
+ *     the key 'datatable_options' to pass an array of DataTable options.
  *   - caption: A localized string to use for the <caption> tag.
  *   - colgroups: An array of column groups. Each element of the array can be
  *     either:
