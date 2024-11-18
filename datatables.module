@@ -18,6 +18,9 @@ function datatables_theme() {
         'caption' => NULL,
       ),
     ),
+    'datatable_tableselect' => array(
+      'render element' => 'element',
+    )
   );
 }
 
@@ -441,4 +444,67 @@ function datatables_autoload_info() {
   return array(
     'datatables_style_plugin' => 'views/datatables_style_plugin.inc',
   );
+}
+
+/**
+ * Implements hook_element_info().
+ * 
+ * Define an element to wrap around tableselect. For information on how to use
+ * this element, refer to Backdrop's Form API documentation at
+ * https://docs.backdropcms.org/form_api
+ * 
+ * For information on datatable settings, refer to the documentation for
+ * theme_datatable() in this file.
+ */
+function datatables_element_info() {
+  $types['datatable_tableselect'] = array(
+    '#input' => TRUE,
+    '#js_select' => TRUE,
+    '#multiple' => TRUE,
+    '#process' => array('form_process_tableselect'),
+    '#options' => array(),
+    '#empty' => '',
+    '#theme' => 'datatable_tableselect',
+  );
+  return $types;
+}
+
+/**
+ *  Returns HTML for a table with radio buttons or checkboxes.
+ * 
+ * Adds datatable functionality.
+ */
+function theme_datatable_tableselect($variables) {
+  $element = &$variables['element'];
+  $header = &$element['#header'];
+  $attributes = &$element['#attributes'];
+
+  if (isset($element['#options'])) {
+    $datatable_options = !empty($attributes['datatable_options']) ? $attributes['datatable_options'] : array();
+
+    // Column settings can either be set with the global options
+    // or in each header definition.
+    if (!isset($datatable_options['columns'])) {
+      foreach ($header as $key => $cell) {
+        if (isset($cell['datatable_options'])) {
+          $datatable_options['columns'][] = $cell['datatable_options'];
+          if (is_array($header[$key])) {
+            unset($header[$key]['datatable_options']);
+          }
+        }
+      }
+    }
+
+    // Set unique id.
+    if (!isset($attributes['id'])) {
+      $attributes['id'] = _datatables_get_id();
+    }
+
+    backdrop_add_library('datatables', 'datatables');
+    backdrop_add_js(array('datatables' => array('#' . $attributes['id'] => $datatable_options)), 'setting');
+    unset($attributes['datatable_options']);
+
+  }
+
+  return theme('tableselect', $variables);
 }
