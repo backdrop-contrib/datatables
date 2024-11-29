@@ -106,7 +106,7 @@ function datatables_views_api() {
  *      ),
  *   );
  * @endcode
- * 
+ *
  * Then, these parameters must be passed to the theming function under the `attributes` key, as in:
  * @code
  *   $output = theme('datatable', array('header' => $header, 'rows' => $rows, 'attributes' => $parameters));
@@ -226,7 +226,7 @@ function theme_datatable($variables) {
   $header = &$variables['header'];
   $attributes = &$variables['attributes'];
 
-  if (isset($variables['rows'])) {
+  if (!empty($variables['rows'])) {
     $datatable_options = !empty($attributes['datatable_options']) ? $attributes['datatable_options'] : array();
 
     // Column settings can either be set with the global options
@@ -454,11 +454,11 @@ function datatables_autoload_info() {
 
 /**
  * Implements hook_element_info().
- * 
+ *
  * Define an element to wrap around tableselect. For information on how to use
  * this element, refer to Backdrop's Form API documentation at
  * https://docs.backdropcms.org/form_api
- * 
+ *
  * For information on datatable settings, refer to the documentation for
  * theme_datatable() in this file.
  */
@@ -477,7 +477,7 @@ function datatables_element_info() {
 
 /**
  *  Returns HTML for a table with radio buttons or checkboxes.
- * 
+ *
  * Adds datatable functionality.
  */
 function theme_datatable_tableselect($variables) {
