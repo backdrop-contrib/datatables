@@ -36,6 +36,11 @@
             renderer: DataTable.Responsive.renderer.tableAll()
           } };
 */
+          // Forward the query parameters to the DataTables server processing
+          if (typeof settings.ajax !== 'undefined') {
+            settings.ajax.data = function (d) { d.query = window.location.search; };
+          }
+
           var table = $(selector).DataTable(settings);
         });
       });

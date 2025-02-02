@@ -40,13 +40,15 @@ function datatables_library_info() {
       'version' => '2.0.5',
       'js' => array(
         $lib_path . '/dataTables.min.js' => array(),
-        backdrop_get_path('module', 'datatables') . '/js/datatables.js' => array(),
         $lib_path . '/dataTables.responsive.min.js' => array(),
 //        $lib_path . '/responsive.dataTables.js' => array(), // why???
+        $lib_path . '/dataTables.scroller.min.js' => array(),
+        backdrop_get_path('module', 'datatables') . '/js/datatables.js' => array(),
       ),
       'css' => array(
         $lib_path . '/dataTables.dataTables.min.css' => array(),
         $lib_path . '/responsive.dataTables.min.css' => array(),
+        $lib_path . '/scroller.dataTables.min.css' => array(),
       ),
     );
 
@@ -279,7 +281,6 @@ function template_preprocess_datatables_view(&$vars) {
   $position = 0;
   foreach ($columns as $field => $column) {
     $column_options = NULL;
-
     if (isset($options['hidden_columns'][$field])) {
       switch ($options['hidden_columns'][$field]) {
         case 'expandable':
@@ -298,11 +299,20 @@ function template_preprocess_datatables_view(&$vars) {
     }
 
     // Render the header labels.
+    // TODO: what to do if field != column (field displayed with other column)?
     if ($field == $column && empty($fields[$field]->options['exclude'])) {
       // Overrides clicksort head defined in
       // template_preprocess_views_view_table().
       $vars['header'][$field] = check_plain(!empty($fields[$field]) ? $fields[$field]->label() : '');
       $column_options['title'] = $vars['header'][$field];
+      // Add a column name and database column name
+      $column_options['name'] = $fields[$field]->field_alias;
+      $column_options['data'] = $field;
+
+      // Set column alignment
+      if (!empty($options['info'][$field]['align'])) {
+        $column_options['className'] = str_replace('views-align-', 'dt-', $options['info'][$field]['align']);
+      }
 
       if (empty($options['info'][$field]['sortable']) || !$fields[$field]->click_sortable()) {
         $column_options['orderable'] = FALSE;
@@ -342,6 +352,7 @@ function template_preprocess_datatables_view(&$vars) {
   $datatable_options['stateSave'] = $options['elements']['save_state'];
 
   $datatable_options['lengthChange'] = $options['pages']['length_change'];
+  $datatable_options['lengthMenu'] = [10, 25, 50, 100, [ 'label' => 'All', 'value' => -1 ]];
   $datatable_options['pageLength'] = (int) $options['pages']['display_length'];
 
   // Enable ThemeRoller support, if necessary.
@@ -359,30 +370,66 @@ function template_preprocess_datatables_view(&$vars) {
 
   // Enable full_numbers pagination if selected.
   switch ($options['pages']['pagination_style']) {
-    case 'full_numbers':
-      $datatable_options['pagingType'] = 'full_numbers';
+    case 'simple_numbers':
+      $datatable_options['pagingType'] = 'simple_numbers';
+      break;
+
+    case 'scroller':
+      $datatable_options['scroller'] = TRUE;
+      $datatable_options['deferRender'] = TRUE;
+      $datatable_options['scrollY'] = is_numeric($options['pages']['vheight']) ? $options['pages']['vheight'] . 'px' : $options['pages']['vheight'];
+      $datatable_options['scrollCollapse'] = TRUE; // force height given in scrollY
       break;
 
     case 'no_pagination':
       $datatable_options['paging'] = FALSE;
+      $datatable_options['info'] = FALSE;
+      $datatable_options['lengthChange'] = FALSE;
       break;
 
     default:
-      // Do nothing. No parameters need to be sent for the default (simple
+      // Do nothing. No parameters need to be sent for the default (full
       // numbers) style.
+      break;
+  }
+
+  switch ($options['pages']['processing']) {
+    case 'serverside':
+      if ($options['pages']['pagination_style'] != 'no_pagination') {
+        $url = url('datatables/server/' . $view->name . '/' . $view->current_display);
+        $datatable_options['ajax']['url'] = $url;
+        $datatable_options['processing'] = true;
+        $datatable_options['serverSide'] = true;
+      }
+      break;
+    default:
       break;
   }
 
   // Enable Buttons (successor of TableTools) plugin support, if necessary.
   if (!empty($options['elements']['table_tools'])) {
-    $datatable_options['buttons'] = [
-      ['extend' => 'colvis', 'text' => 'Columns', 'titleAttr' => 'Show/hide columns'],
-      ['extend' => 'collection', 'text' => 'Export', 'titleAttr' => 'Export data of the table into various formats', 'buttons' => ['copy', 'csv', 'excel', 'pdf', 'print']],
-    ];
+
+    $datatable_options['buttons'] = array();
 
     if ($datatable_options['lengthChange']) {
-      $datatable_options['buttons'][] = ['extend' => 'pageLength', 'text' => 'Rows', 'titleAttr' => 'Select number of rows shown per page'];
+      $datatable_options['buttons'][] = [
+        'extend' => 'pageLength',
+        'text' => 'Rows',
+        'titleAttr' => 'Select number of rows shown per page'
+      ];
     }
+
+    $datatable_options['buttons'][] = [
+      'extend' => 'colvis',
+      'text' => 'Columns',
+      'titleAttr' => 'Show/hide columns'
+    ];
+    $datatable_options['buttons'][] = [
+      'extend' => 'collection',
+      'text' => 'Export',
+      'titleAttr' => 'Export data of the table into various formats',
+      'buttons' => ['copy', 'csv', 'excel', 'pdf', 'print']
+    ];
 
     // If a custom dom parameter is passed, assume that "B" is added, otherwise
     // add it manually.
@@ -433,6 +480,84 @@ function template_preprocess_datatables_view(&$vars) {
 
   backdrop_add_library('datatables', 'datatables');
   backdrop_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
+}
+
+/**
+ * Implements hook_views_query_alter().
+ */
+function datatables_views_query_alter(&$view, &$query) {
+
+  if ($view->plugin_name == 'datatables') {
+
+    $options  = $view->style_plugin->options;
+    if ($options['pages']['pagination_style'] != 'no_pagination') {
+
+      // Ensure View does not use Ajax
+      if ($view->use_ajax) {
+        $view->use_ajax = FALSE;
+      }
+
+      // Get pager options.
+      $view->init_pager();
+
+      // This section is only for server-side processing.
+      if ($view->tag == 'datatables_server_processing') {
+
+        // A pager with paging is needed so Views calculates total rows.
+        $pager = $view->display_handler->get_plugin('pager', 'mini');
+
+        // Set limits from request.
+        $request = $_GET;
+        $pager->options['offset'] = $request['start'];
+        // All records requested = -1 (DataTables) = 0 (Views).
+        if ($request['length'] == -1) {
+          $pager->options['items_per_page'] = 0;
+        } else {
+          $pager->options['items_per_page'] = $request['length'];
+        }
+
+        // Set ordering
+        if (isset($request['dt_order'])) {
+          foreach ($request['dt_order'] as $i => $order) {
+            $view->query->orderby[$i]['field'] = $order['name'];
+            $view->query->orderby[$i]['direction'] = $order['dir'];
+          }
+        }
+
+      // This section is for client-side processing
+      } else {
+        // A pager without paging is needed, so it is not duplicated.
+        $pager = $view->display_handler->get_plugin('pager', 'some');
+        // Only put minimum result in the first request by Views.
+        // TODO: can we completely avoid it?
+        if ($options['pages']['processing'] == 'serverside') {
+          $pager->options['items_per_page'] = 1;
+        // Request all records when we use client-side processing.
+        } else {
+          $pager->options['items_per_page'] = 0;
+        }
+      }
+
+      // Replace default with our customised pager in the View.
+      $view->query->pager = $pager;
+    } else {
+    }
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function datatables_menu() {
+  $items['datatables/server'] = array(
+    'page callback' => 'datatables_server_processing',
+#    'access callback' => TRUE,
+    'access arguments' => array('access content'),
+    'file' => 'datatables_server_processing.inc',
+#    'file path' => backdrop_get_path('module', 'datatables'),
+  );
+
+  return $items;
 }
 
 /**

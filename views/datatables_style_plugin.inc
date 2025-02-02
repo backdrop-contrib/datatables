@@ -36,6 +36,8 @@ class datatables_style_plugin extends views_plugin_style_table {
     $options['pages'] = array(
       'default' => array(
         'pagination_style' => 0,
+        'processing' => 0,
+        'vheight' => 0,
         'length_change' => 0,
         'display_length' => 10,
       ),
@@ -135,26 +137,76 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Pagination Style'),
       '#default_value' => isset($this->options['pages']['pagination_style']) ? $this->options['pages']['pagination_style'] : 0,
       '#options' => array(
-        0 => t('Simple Numbers (Default)'),
-        'full_numbers' => t('Full Numbers'),
-        'no_pagination' => t('No Pagination'),
+        0 => t('Full Numbers (Default)'),
+        'simple_numbers' => t('Simple Numbers'),
+        'scroller' => t('Scroller'),
+        'no_pagination' => t('No Pagination (use Views Pager)'),
       ),
       '#description' => t('Selects which pagination style should be used.'),
+    );
+
+    $form['pages']['vheight'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Vertical height'),
+      '#description' => t('Vertical height as any CSS unit, or a number in pixels.'),
+      '#size'=> 15,
+      '#default_value' => isset($this->options['pages']['vheight']) ? $this->options['pages']['vheight'] : '',
+      '#states' => array(
+        'visible' => array(
+          ':input[name="style_options[pages][pagination_style]"]' => array('value' => 'scroller'),
+        ),
+        'required' => array(
+          ':input[name="style_options[pages][pagination_style]"]' => array('value' => 'scroller'),
+        ),
+      ),
     );
 
     $form['pages']['length_change'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable Length Change Selection Box'),
+      '#description' => t('Enable page length selection menu.'),
       '#default_value' => !empty($this->options['pages']['length_change']),
-      '#description' => t('Enable or page length selection menu'),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="style_options[pages][pagination_style]"]' => array(
+            array('value' => 0),
+            array('value' => 'simple_numbers'),
+          ),
+        ),
+      ),
     );
 
     $form['pages']['display_length'] = array(
       '#type' => 'textfield',
       '#title' => t('Default Page Length'),
-      '#description' => t('Default number of records to show per page. May be adjusted by users if Length Selection is enabled'),
+      '#description' => t('Default number of records to show per page. May be adjusted by users if Length Selection is enabled.'),
+      '#size'=> 10,
       '#default_value' => isset($this->options['pages']['display_length']) ? $this->options['pages']['display_length'] : 10,
       '#element_validate' => array('element_validate_integer_positive'),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="style_options[pages][pagination_style]"]' => array(
+            array('value' => 0),
+            array('value' => 'simple_numbers'),
+          ),
+        ),
+      ),
+    );
+
+    $form['pages']['processing'] = array(
+      '#type' => 'select',
+      '#title' => t('Processing'),
+      '#default_value' => isset($this->options['pages']['processing']) ? $this->options['pages']['processing'] : 0,
+      '#options' => array(
+        0 => t('Client-side (Default)'),
+        'serverside' => t('Server-side'),
+      ),
+      '#description' => t('Selects which processing should be used.'),
+      '#states' => array(
+        'invisible' => array(
+          ':input[name="style_options[pages][pagination_style]"]' => array('value' => 'no_pagination'),
+        ),
+      ),
     );
 
     $columns = $this->display->handler->get_field_labels();
