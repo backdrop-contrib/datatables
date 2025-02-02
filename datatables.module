@@ -289,12 +289,11 @@ function template_preprocess_datatables_view(&$vars) {
           $column_options['className'] = 'none';
           break;
         case 'hidden':
-          // Hidden or expandable columns get the visible init option set to
-          // false.
+          // Hidden columns get the visible init option set to false.
           $column_options['visible'] = FALSE;
-#          break;
-#        default:
-#          $column_options['visible'] = TRUE;
+          break;
+        default:
+          $column_options['visible'] = TRUE;
       }
     }
 
@@ -393,17 +392,11 @@ function template_preprocess_datatables_view(&$vars) {
       break;
   }
 
-  switch ($options['pages']['processing']) {
-    case 'serverside':
-      if ($options['pages']['pagination_style'] != 'no_pagination') {
-        $url = url('datatables/server/' . $view->name . '/' . $view->current_display);
-        $datatable_options['ajax']['url'] = $url;
-        $datatable_options['processing'] = true;
-        $datatable_options['serverSide'] = true;
-      }
-      break;
-    default:
-      break;
+  if ($options['pages']['processing'] == 'serverside' && $options['pages']['pagination_style'] != 'no_pagination') {
+    $url = url('datatables/server/' . $view->name . '/' . $view->current_display);
+    $datatable_options['ajax']['url'] = $url;
+    $datatable_options['processing'] = true;
+    $datatable_options['serverSide'] = true;
   }
 
   // Enable Buttons (successor of TableTools) plugin support, if necessary.
@@ -486,7 +479,6 @@ function template_preprocess_datatables_view(&$vars) {
  * Implements hook_views_query_alter().
  */
 function datatables_views_query_alter(&$view, &$query) {
-
   if ($view->plugin_name == 'datatables') {
 
     $options  = $view->style_plugin->options;
@@ -537,7 +529,6 @@ function datatables_views_query_alter(&$view, &$query) {
           $pager->options['items_per_page'] = 0;
         }
       }
-
       // Replace default with our customised pager in the View.
       $view->query->pager = $pager;
     } else {
