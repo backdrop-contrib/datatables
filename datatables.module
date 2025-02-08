@@ -488,7 +488,7 @@ function template_preprocess_datatables_view(&$vars) {
  */
 function datatables_views_query_alter(&$view, &$query) {
 
-  if ($view->plugin_name == 'datatables') {
+  if ($view->plugin_name == 'datatables' && !$view->selective_oids) {
 
     $options  = $view->style_plugin->options;
     if ($options['pages']['pagination_style'] != 'no_pagination') {
@@ -541,7 +541,6 @@ function datatables_views_query_alter(&$view, &$query) {
 
       // Replace default with our customised pager in the View.
       $view->query->pager = $pager;
-    } else {
     }
   }
 }
