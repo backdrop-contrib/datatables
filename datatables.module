@@ -306,7 +306,8 @@ function template_preprocess_datatables_view(&$vars) {
       $vars['header'][$field] = check_plain(!empty($fields[$field]) ? $fields[$field]->label() : '');
       $column_options['title'] = $vars['header'][$field];
       // Add a column name and database column name
-      $column_options['name'] = $fields[$field]->field_alias;
+#      $column_options['name'] = $fields[$field]->field_alias;
+      $column_options['name'] = $field;
       $column_options['data'] = $field;
 
       // Set column alignment
