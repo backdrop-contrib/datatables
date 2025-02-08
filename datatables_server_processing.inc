@@ -45,6 +45,7 @@ function datatables_server_processing($view_name, $display_name = 'page') {
     $where = ['type' => 'OR'];
     foreach ($request['columns'] as $c =>$col) {
       $field = $view->field[$col['data']];
+      if ($field->table == 'views') continue; // skip pseudo-columns
       $where['conditions'][] = array(
         'field' => $field->table . '.' . $field->real_field,
         'value' => '%' . trim($string) . '%',

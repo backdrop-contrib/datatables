@@ -37,7 +37,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       'default' => array(
         'pagination_style' => 0,
         'processing' => 0,
-        'vheight' => 0,
+        'vheight' => 300,
         'length_change' => 0,
         'display_length' => 10,
       ),
@@ -150,7 +150,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Vertical height'),
       '#description' => t('Vertical height as any CSS unit, or a number in pixels.'),
       '#size'=> 15,
-      '#default_value' => isset($this->options['pages']['vheight']) ? $this->options['pages']['vheight'] : '',
+      '#default_value' => isset($this->options['pages']['vheight']) ? $this->options['pages']['vheight'] : '300',
       '#states' => array(
         'visible' => array(
           ':input[name="style_options[pages][pagination_style]"]' => array('value' => 'scroller'),
