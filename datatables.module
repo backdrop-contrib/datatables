@@ -408,20 +408,20 @@ function template_preprocess_datatables_view(&$vars) {
     if ($datatable_options['lengthChange']) {
       $datatable_options['buttons'][] = [
         'extend' => 'pageLength',
-        'text' => 'Rows',
-        'titleAttr' => 'Select number of rows shown per page'
+        'text' => t('Rows'),
+        'titleAttr' => t('Select number of rows shown per page')
       ];
     }
 
     $datatable_options['buttons'][] = [
       'extend' => 'colvis',
-      'text' => 'Columns',
-      'titleAttr' => 'Show/hide columns'
+      'text' => t('Columns'),
+      'titleAttr' => t('Show/hide columns')
     ];
     $datatable_options['buttons'][] = [
       'extend' => 'collection',
-      'text' => 'Export',
-      'titleAttr' => 'Export data of the table into various formats',
+      'text' => t('Export'),
+      'titleAttr' => t('Export data of the table into various formats'),
       'buttons' => ['copy', 'csv', 'excel', 'pdf', 'print']
     ];
 
@@ -435,7 +435,7 @@ function template_preprocess_datatables_view(&$vars) {
     backdrop_add_library('datatables', 'datatables-buttons');
   }
 
-  // Note: a nice overview of text options, but this is not needed
+  // Note: a nice overview of text options - these strings can be translated
   $datatable_options['language'] = array(
     'emptyTable' => t('No data available in table'),
     'info' => t('Showing !_START_ to !_END_ of !_TOTAL_ entries', array('!_START_' => '_START_', '!_END_' => '_END_', '!_TOTAL_' => '_TOTAL_')),
@@ -456,6 +456,18 @@ function template_preprocess_datatables_view(&$vars) {
     'aria' => array(
       'orderable' => t(': activate to order by this column'),
       'orderableReverse' => t(': activate to order by this column'),
+    ),
+    'buttons' => array(
+      'copy' => t('Copy'),
+      'copySuccess' => array(
+        '1' => t('Copied 1 row to clipboard'),
+        '_' => t('Copied %d rows to clipboard'),
+      ),
+      'copyTitle' => t('Copy to Clipboard'),
+      'csv' => t('CSV'),
+      'excel' => t('Excel'),
+      'pdf' => t('PDF'),
+      'print' => t('Print'),
     ),
   );
 
