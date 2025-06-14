@@ -493,7 +493,7 @@ function template_preprocess_datatables_view(&$vars) {
  */
 function datatables_views_query_alter(&$view, &$query) {
 
-  if ($view->plugin_name == 'datatables' && !$view->selective_oids) {
+  if ($view->plugin_name == 'datatables' ) {
 
     $options  = $view->style_plugin->options;
     if ($options['pages']['pagination_style'] != 'no_pagination') {
