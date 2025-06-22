@@ -345,6 +345,24 @@ function template_preprocess_datatables_view(&$vars) {
     }
   }
 
+  // Add default sorting from View if not set in table options
+  if (!isset($datatable_options['order'])) {
+    foreach ($view->sort as $sortfield) {
+      foreach ($view->field as $field) {
+        if ($field->real_field == $sortfield->options['field']) {
+          foreach ($datatable_options['columns'] as $position => $column) {
+            if ($column['data'] == $field->field) {
+              // Multi-column ordering using an array of column index and direction
+              // For example: [[0, 'asc'],[1, 'desc']]
+              $datatable_options['order'][] = array($position, strtolower($sortfield->options['order']));
+              break 2;
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Enable table info display and other options, if necessary.
   $datatable_options['info'] = $options['elements']['table_info'];
   $datatable_options['searching'] = $options['elements']['search_box'];
