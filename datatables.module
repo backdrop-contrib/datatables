@@ -49,6 +49,7 @@ function datatables_library_info() {
         $lib_path . '/dataTables.dataTables.min.css' => array(),
         $lib_path . '/responsive.dataTables.min.css' => array(),
         $lib_path . '/scroller.dataTables.min.css' => array(),
+        backdrop_get_path('module', 'datatables') . '/css/datatables.css' => array(),
       ),
     );
 
@@ -265,20 +266,29 @@ function template_preprocess_datatables_view(&$vars) {
   // classes, etc.
   template_preprocess_views_view_table($vars);
 
-  // No need to add anything if there are no rows.
-  if (!$vars['rows']) {
-    return;
-  }
-
   $view     = $vars['view'];
 
   $options  = $view->style_plugin->options;
+
+  // No need to add anything if there are no rows. With server-side processing
+  // the table is rendered empty on purpose: DataTables fetches the rows.
+  $is_serverside = $view->style_plugin->is_serverside();
+  if ($is_serverside) {
+    module_load_include('inc', 'datatables', 'datatables.server');
+  }
+  if (!$vars['rows'] && !$is_serverside) {
+    return;
+  }
   $handler  = $view->style_plugin;
 
   $fields   = &$view->field;
   $columns  = $handler->sanitize_columns($options['columns'], $fields);
 
   $position = 0;
+  $column_filters = array();
+  $column_split = array();
+  $date_fields = array();
+  $serverside = $is_serverside;
   foreach ($columns as $field => $column) {
     $column_options = NULL;
     if (isset($options['hidden_columns'][$field])) {
@@ -308,6 +318,21 @@ function template_preprocess_datatables_view(&$vars) {
       $column_options['name'] = $fields[$field]->field_alias;
       $column_options['data'] = $field;
 
+      // Responsive: columns with a low "Responsive priority" (setting of the
+      // table style) are hidden first when the table gets too wide for its
+      // container. DataTables hides the columns with the highest number first
+      // and, among equal priorities, the right-most one.
+      $responsive = isset($options['info'][$field]['responsive']) ? $options['info'][$field]['responsive'] : '';
+      if ($responsive === RESPONSIVE_PRIORITY_LOW) {
+        $column_options['responsivePriority'] = 1000;
+      }
+      elseif ($responsive === RESPONSIVE_PRIORITY_MEDIUM) {
+        $column_options['responsivePriority'] = 100;
+      }
+      else {
+        $column_options['responsivePriority'] = 1;
+      }
+
       // Set column alignment
       if (!empty($options['info'][$field]['align'])) {
         $column_options['className'] = str_replace('views-align-', 'dt-', $options['info'][$field]['align']);
@@ -319,19 +344,41 @@ function template_preprocess_datatables_view(&$vars) {
       else {
         // Attempt to autodetect the type of field in order to handle sorting
         // correctly.
-        if (backdrop_strlen($fields[$field]->last_render) != backdrop_strlen(strip_tags($fields[$field]->last_render))) {
+        // last_render does not exist when the table is rendered without rows
+        // (server-side processing).
+        $last_render = isset($fields[$field]->last_render) ? (string) $fields[$field]->last_render : '';
+        if (backdrop_strlen($last_render) != backdrop_strlen(strip_tags($last_render))) {
           $column_options['type'] = 'html';
         }
-        elseif (is_numeric($fields[$field]->last_render) || $fields[$field] instanceof views_handler_field_numeric) {
+        elseif (is_numeric($last_render) || $fields[$field] instanceof views_handler_field_numeric) {
 #not good          $column_options['type'] = 'num-fmt';
-        }
-        elseif ($fields[$field] instanceof views_handler_field_date || $fields[$field] instanceof views_handler_field_datetime) {
-          $column_options['type'] = 'date';
-#          backdrop_add_library('datatables', 'datatables-moment');
-#          backdrop_add_js("DataTable.datetime( 'DD.MM.YYYY HH:mm' );", array('type' => 'inline', 'scope' => 'footer'));
         }
         $column_options['orderable'] = TRUE;
       }
+      // Dates: the type "date" would make DataTables put the class
+      // dt-type-date (right aligned) on the header, overriding the alignment
+      // set in the style options. The column is declared as text instead and
+      // sorted by the raw value, which is added to the cells as data-order.
+      if (_datatables_is_date_field($fields[$field])) {
+        $column_options['type'] = 'string';
+        $date_fields[$field] = TRUE;
+      }
+      // Column filters (text box or drop-down with the distinct values).
+      // With server-side processing only columns that can be filtered in SQL
+      // get a filter, otherwise it would silently do nothing.
+      $filter_mode = isset($options['filters'][$field]) ? $options['filters'][$field] : 'none';
+      if (in_array($filter_mode, array('text', 'select'))) {
+        if (!$is_serverside || datatables_server_field_target($fields[$field])) {
+          $column_filters[$field] = $filter_mode;
+          // A field that shows several values in one cell is split, so the
+          // drop-down offers every single value (client-side filtering).
+          $item_split = _datatables_item_split($fields[$field]);
+          if ($item_split) {
+            $column_split[$field] = $item_split;
+          }
+        }
+      }
+
       $datatable_options['columns'][] = $column_options;
 
       // Set default sort order.
@@ -365,11 +412,18 @@ function template_preprocess_datatables_view(&$vars) {
 
   // Enable table info display and other options, if necessary.
   $datatable_options['info'] = $options['elements']['table_info'];
-  $datatable_options['searching'] = $options['elements']['search_box'];
+  // Searching stays enabled even without the search box: DataTables also
+  // switches off the column filters when "searching" is false. The box itself
+  // is hidden by js/datatables.js.
+  $datatable_options['searching'] = TRUE;
   $datatable_options['stateSave'] = $options['elements']['save_state'];
 
   $datatable_options['lengthChange'] = $options['pages']['length_change'];
-  $datatable_options['lengthMenu'] = [10, 25, 50, 100, [ 'label' => 'All', 'value' => -1 ]];
+  // "All" is not offered with server-side processing (see
+  // datatables_server_parse_request()).
+  $datatable_options['lengthMenu'] = $is_serverside
+    ? [10, 25, 50, 100]
+    : [10, 25, 50, 100, [ 'label' => 'All', 'value' => -1 ]];
   $datatable_options['pageLength'] = (int) $options['pages']['display_length'];
 
   // Enable ThemeRoller support, if necessary.
@@ -383,7 +437,9 @@ function template_preprocess_datatables_view(&$vars) {
     $datatable_options['dom'] = $options['layout']['sdom'];
   }
 
-  $datatable_options['autoWidth'] = $options['layout']['autowidth'];
+  // Always on: Responsive can only follow window resizes when DataTables
+  // calculates the column widths (it then also listens to window resizes).
+  $datatable_options['autoWidth'] = TRUE;
 
   // Enable full_numbers pagination if selected.
   switch ($options['pages']['pagination_style']) {
@@ -410,11 +466,49 @@ function template_preprocess_datatables_view(&$vars) {
       break;
   }
 
-  if ($options['pages']['processing'] == 'serverside' && $options['pages']['pagination_style'] != 'no_pagination') {
-    $url = url('datatables/server/' . $view->name . '/' . $view->current_display);
-    $datatable_options['ajax']['url'] = $url;
-    $datatable_options['processing'] = true;
-    $datatable_options['serverSide'] = true;
+  // Sort keys of date cells (see above).
+  $vars['data_order'] = array();
+  if ($date_fields) {
+    foreach ($vars['rows'] as $count => $row) {
+      foreach (array_keys($date_fields) as $field) {
+        if (!isset($view->result[$count]) || empty($fields[$field]->field_alias)) {
+          continue;
+        }
+        $raw = isset($view->result[$count]->{$fields[$field]->field_alias}) ? $view->result[$count]->{$fields[$field]->field_alias} : '';
+        if (is_numeric($raw)) {
+          // Timestamps: fixed length, so text order is numeric order.
+          $raw = sprintf('%012d', max(0, (int) $raw));
+        }
+        $vars['data_order'][$count][$field] = (string) $raw;
+      }
+    }
+  }
+
+  // Settings for our own JavaScript (not DataTables options).
+  $datatable_options['backdrop'] = array(
+    'serverSide' => $serverside,
+    'filters' => $column_filters,
+    'split' => $column_split,
+    'cascade' => !empty($options['filter_options']['cascade']),
+    // A table with a fixed height scrolls its body inside the page; its
+    // header stays in place without any help.
+    'hideSearch' => empty($options['elements']['search_box']),
+    'sticky' => !empty($options['sticky']) && empty($datatable_options['scrollY']) && empty($view->live_preview),
+    'stickyOffset' => isset($options['sticky_offset']) ? trim($options['sticky_offset']) : '',
+  );
+  if ($serverside) {
+    // The rows are requested through Backdrop's Views Ajax callback
+    // (views/ajax); see js/datatables.js and datatables.server.inc.
+    module_load_include('inc', 'datatables', 'datatables.server');
+    $datatable_options['processing'] = TRUE;
+    $datatable_options['serverSide'] = TRUE;
+    $datatable_options['backdrop']['exposedInput'] = datatables_server_exposed_input($view);
+  }
+
+  // A second header row holds the column filters.
+  $vars['filters'] = $column_filters;
+  if ($column_filters) {
+    $datatable_options['orderCellsTop'] = TRUE;
   }
 
   // Enable Buttons (successor of TableTools) plugin support, if necessary.
@@ -497,7 +591,16 @@ function template_preprocess_datatables_view(&$vars) {
   }
 */
 
+  // Tell the editor that the preview shows only some of the rows.
+  $preview_limit = _datatables_preview_limit($view);
+  if (!empty($view->live_preview) && $preview_limit > 0 && count($vars['rows']) >= $preview_limit) {
+    $vars['title'] = t('Preview: only the first @count rows are loaded. The limit is set in the style settings.', array('@count' => $preview_limit));
+  }
+
   $vars['id'] = _datatables_get_id();
+  // The parent table preprocess adds Backdrop's own sticky header (a cloned
+  // header); this module makes the real header sticky, see js/datatables.js.
+  $vars['classes'] = array_diff($vars['classes'], array('sticky-enabled', 'responsive-enabled'));
   $vars['classes'][] = 'display';
   $vars['classes'][] = 'nowrap';  // recommended for responsive tables
 
@@ -506,80 +609,148 @@ function template_preprocess_datatables_view(&$vars) {
 }
 
 /**
+ * Returns the maximum number of rows loaded in the Views preview (0 = all).
+ *
+ * Views saved before this option existed do not have it.
+ */
+function _datatables_preview_limit($view) {
+  $pages = $view->style_plugin->options['pages'];
+  return isset($pages['preview_limit']) ? max(0, (int) $pages['preview_limit']) : 100;
+}
+
+/**
+ * Tells whether a view uses the DataTables style with a Views pager replaced
+ * by DataTables.
+ */
+function _datatables_view_uses_datatables($view) {
+  return !empty($view->style_plugin)
+    && $view->style_plugin instanceof datatables_style_plugin
+    && $view->style_plugin->options['pages']['pagination_style'] != 'no_pagination';
+}
+
+/**
+ * Tells whether a view is rendered with DataTables server-side processing.
+ */
+function _datatables_view_is_serverside($view) {
+  return _datatables_view_uses_datatables($view)
+    && $view->style_plugin->is_serverside();
+}
+
+/**
+ * Implements hook_views_pre_view().
+ *
+ * Picks up a DataTables request that arrived through views/ajax. Views has
+ * already loaded the view, checked access, set the display and the
+ * contextual arguments, and merged the POST data into $_GET (so exposed
+ * filters work as on a normal page).
+ */
+function datatables_views_pre_view(&$view, &$display_id, &$args) {
+  if (empty($view->dom_id) || empty($_POST['datatables']) || !is_array($_POST['datatables'])) {
+    return;
+  }
+  if (!empty($view->is_attachment) || !empty($view->datatables_request)) {
+    return;
+  }
+  if ($view->display_handler->get_option('style_plugin') != 'datatables') {
+    return;
+  }
+
+  module_load_include('inc', 'datatables', 'datatables.server');
+  $request = datatables_server_parse_request($_POST['datatables']);
+  // Only answer requests meant for this very view instance.
+  if ($request['dom_id'] !== $view->dom_id) {
+    return;
+  }
+
+  // The request must not leak into exposed input, pagers or sort links.
+  unset($_POST['datatables'], $_GET['datatables'], $_REQUEST['datatables']);
+
+  $view->datatables_request = $request;
+  $view->datatables_role = 'main';
+  // The query result of this request depends on the DataTables parameters, so
+  // it must never be served from or stored in the Views cache.
+  $view->display_handler->set_option('cache', array('type' => 'none', 'options' => array()));
+  // We need the number of matching rows for "recordsFiltered".
+  $view->get_total_rows = TRUE;
+}
+
+/**
  * Implements hook_views_query_alter().
+ *
+ * DataTables has its own pager, so the Views pager is replaced by a pager that
+ * renders nothing.
  */
 function datatables_views_query_alter(&$view, &$query) {
+  if (!_datatables_view_uses_datatables($view)) {
+    return;
+  }
 
-  if ($view->plugin_name == 'datatables' ) {
+  // A new pager object is needed for every view: get_plugin() returns one
+  // cached instance per plugin name for the whole request, bound to the view
+  // that asked first, which breaks pages with several views.
+  $pager = views_get_plugin('pager', 'some');
+  $pager->init($view, $view->display[$view->current_display], array('items_per_page' => 0, 'offset' => 0));
+  if (_datatables_view_is_serverside($view)) {
+    // Limit and offset are applied in datatables_views_post_build().
+    $pager->options['items_per_page'] = 1;
+  }
+  else {
+    // Client-side processing: request all records. The Views preview (shown
+    // while editing the view) only gets a limited number of rows because it is
+    // reloaded after every change.
+    $preview_limit = !empty($view->live_preview) ? _datatables_preview_limit($view) : 0;
+    $pager->options['items_per_page'] = $preview_limit;
+  }
+  $view->query->pager = $pager;
 
-    $options  = $view->style_plugin->options;
-    if ($options['pages']['pagination_style'] != 'no_pagination') {
+  // Searching or filtering a Field API column needs its table in the query.
+  if (!empty($view->datatables_request) && _datatables_view_is_serverside($view)) {
+    module_load_include('inc', 'datatables', 'datatables.server');
+    datatables_server_join_field_tables($view);
+  }
+}
 
-      // Ensure View does not use Ajax
-      if ($view->use_ajax) {
-        $view->use_ajax = FALSE;
-      }
+/**
+ * Implements hook_views_post_build().
+ */
+function datatables_views_post_build(&$view) {
+  if (!_datatables_view_is_serverside($view)) {
+    return;
+  }
+  module_load_include('inc', 'datatables', 'datatables.server');
 
-      // Get pager options.
-      $view->init_pager();
-
-      // This section is only for server-side processing.
-      if ($view->tag == 'datatables_server_processing') {
-
-        // A pager with paging is needed so Views calculates total rows.
-        $pager = $view->display_handler->get_plugin('pager', 'mini');
-
-        // Set limits from request.
-        $request = $_GET;
-        $pager->options['offset'] = $request['start'];
-        // All records requested = -1 (DataTables) = 0 (Views).
-        if ($request['length'] == -1) {
-          $pager->options['items_per_page'] = 0;
-        } else {
-          $pager->options['items_per_page'] = $request['length'];
-        }
-
-        // Set ordering
-        if (isset($request['dt_order'])) {
-          foreach ($request['dt_order'] as $i => $order) {
-            $view->query->orderby[$i]['field'] = $order['name'];
-            $view->query->orderby[$i]['direction'] = $order['dir'];
-          }
-        }
-
-      // This section is for client-side processing
-      } else {
-        // A pager without paging is needed, so it is not duplicated.
-        $pager = $view->display_handler->get_plugin('pager', 'some');
-        // Only put minimum result in the first request by Views.
-        // TODO: can we completely avoid it?
-        if ($options['pages']['processing'] == 'serverside') {
-          $pager->options['items_per_page'] = 1;
-        // Request all records when we use client-side processing.
-        } else {
-          $pager->options['items_per_page'] = 0;
-        }
-      }
-
-      // Replace default with our customised pager in the View.
-      $view->query->pager = $pager;
+  if (!empty($view->datatables_request)) {
+    datatables_server_apply_request(
+      $view,
+      $view->datatables_request,
+      isset($view->datatables_role) ? $view->datatables_role : 'main',
+      isset($view->datatables_exclude) ? $view->datatables_exclude : NULL
+    );
+  }
+  elseif (empty($view->is_attachment) && empty($view->live_preview) && !empty($view->build_info['query']) && $view->build_info['query'] instanceof SelectQueryInterface) {
+    // Normal page request: the table is rendered empty, DataTables then asks
+    // for the first page itself. No need to run a query for rows we discard.
+    $view->build_info['query']->where('1 = 0');
+    if (!empty($view->build_info['count_query']) && $view->build_info['count_query'] instanceof SelectQueryInterface) {
+      $view->build_info['count_query']->where('1 = 0');
     }
   }
 }
 
 /**
- * Implements hook_menu().
+ * Implements hook_views_ajax_data_alter().
+ *
+ * Replaces the HTML commands of views/ajax by the DataTables answer.
  */
-function datatables_menu() {
-  $items['datatables/server'] = array(
-    'page callback' => 'datatables_server_processing',
-#    'access callback' => TRUE,
-    'access arguments' => array('access content'),
-    'file' => 'datatables_server_processing.inc',
-#    'file path' => backdrop_get_path('module', 'datatables'),
-  );
-
-  return $items;
+function datatables_views_ajax_data_alter(&$commands, $view) {
+  if ($view && !empty($view->datatables_response)) {
+    $commands = array(
+      array(
+        'command' => 'datatablesResponse',
+        'data' => $view->datatables_response,
+      ),
+    );
+  }
 }
 
 /**
@@ -660,4 +831,32 @@ function theme_datatable_tableselect($variables) {
   }
 
   return theme('tableselect', $variables);
+}
+
+/**
+ * Describes how the values of a multi-value field are joined in one cell.
+ *
+ * @return array|null
+ *   array('type' => 'ul'|'ol'|'separator', 'separator' => string) or NULL when
+ *   the field shows one value per cell.
+ */
+function _datatables_item_split($handler) {
+  if (!($handler instanceof views_handler_field_field) || empty($handler->multiple) || empty($handler->options['group_rows'])) {
+    return NULL;
+  }
+  $type = !empty($handler->options['multi_type']) ? $handler->options['multi_type'] : 'separator';
+  $split = array('type' => $type);
+  if ($type == 'separator') {
+    $separator = isset($handler->options['separator']) ? $handler->options['separator'] : ', ';
+    // Same filtering as the field handler applies when it renders the cell.
+    $split['separator'] = filter_xss_admin($separator);
+  }
+  return $split;
+}
+
+/**
+ * Whether a field handler outputs a date.
+ */
+function _datatables_is_date_field($handler) {
+  return $handler instanceof views_handler_field_date || $handler instanceof views_handler_field_datetime;
 }

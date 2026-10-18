@@ -16,8 +16,6 @@ class datatables_style_plugin extends views_plugin_style_table {
   function option_definition() {
     $options = parent::option_definition();
 
-    unset($options['sticky']);
-    unset($options['override']);
 
     $options['elements'] = array(
       'default' => array(
@@ -36,14 +34,25 @@ class datatables_style_plugin extends views_plugin_style_table {
     $options['pages'] = array(
       'default' => array(
         'pagination_style' => 0,
-        'processing' => 0,
         'vheight' => 300,
         'length_change' => 0,
         'display_length' => 10,
+        'preview_limit' => 100,
       ),
     );
     $options['hidden_columns'] = array(
       'default' => array(),
+    );
+    // Per column filter: 'none', 'text' or 'select'.
+    $options['filters'] = array(
+      'default' => array(),
+    );
+    $options['sticky_offset'] = array('default' => '');
+    $options['filter_options'] = array(
+      'default' => array(
+        'limit' => 100,
+        'cascade' => TRUE,
+      ),
     );
     return $options;
   }
@@ -61,7 +70,24 @@ class datatables_style_plugin extends views_plugin_style_table {
       return;
     }
 
-    unset($form['sticky']);
+    // The sticky header is done by this module (CSS), not by Backdrop's
+    // tableheader.js.
+    $form['sticky']['#title'] = t('Sticky table header');
+    $form['sticky']['#description'] = t('Keep the column titles (and column filters) visible at the top of the window while scrolling the page. Not available together with a fixed table height (Scroller), whose header never scrolls away. Not active in the Views preview.');
+    $form['sticky_offset'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Fixed elements above the sticky header'),
+      '#description' => t('Optional CSS selector of other elements that are fixed at the top of the window and must not be covered, e.g. <code>#site-banner, .navbar-fixed</code>. Fixed or sticky &lt;header&gt; elements and the administration bar are found automatically.'),
+      '#default_value' => isset($this->options['sticky_offset']) ? $this->options['sticky_offset'] : '',
+      '#states' => array(
+        'visible' => array(
+          ':input[name="style_options[sticky]"]' => array('checked' => TRUE),
+        ),
+      ),
+    );
+    // "Show the empty text in the table" makes no sense here: DataTables
+    // shows its own "No matching records found" row.
+    unset($form['empty_table']);
     unset($form['override']);
 
     $form['description_markup']['#markup'] = '<div class="description form-item">' . t('DataTables works best if you set the pager to display all items, since DataTabels contains its own pager implementation.<br/><br/>Place fields into columns; you may combine multiple fields into the same column. If you do, the separator in the column specified will be used to separate the fields. Check the sortable box to make that column click sortable, and check the default sort radio to determine which column will be sorted by default, if any. You may control column order and field labels in the fields section.') . '</div>';
@@ -77,7 +103,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#type' => 'checkbox',
       '#title' => t('Enable the search filter box.'),
       '#default_value' => !empty($this->options['elements']['search_box']),
-      '#description' => 'The search filter box allows users to dynamically filter the results in the table.  Disabling this option will hide the search filter box from users.',
+      '#description' => 'The search filter box allows users to dynamically filter the results in the table.  Disabling this option hides the search filter box; the column filters keep working.',
     );
     $form['elements']['table_info'] = array(
       '#type' => 'checkbox',
@@ -105,13 +131,6 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#collapsed' => TRUE,
     );
 
-    $form['layout']['autowidth'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Enable auto-width calculation.'),
-      '#default_value' => !empty($this->options['layout']['autowidth']),
-      '#description' => t('Enable or disable automatic column width calculation. This can be disabled as an optimisation (it takes some time to calculate the widths).'),
-    );
-
     $form['layout']['themeroller'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable jQuery UI ThemeRoller Support (Deprecated)'),
@@ -131,6 +150,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Pagination and Page Length'),
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
+      '#description' => t('If this display uses AJAX (Advanced settings: <em>Use AJAX</em>), the rows of each page are requested from the server (<em>server-side processing</em>, suited for large data sets). Otherwise all rows are loaded at once and DataTables works in the browser. With <em>No Pagination</em> the Views pager is used and all rows of the current Views page are loaded.'),
     );
     $form['pages']['pagination_style'] = array(
       '#type' => 'select',
@@ -193,20 +213,13 @@ class datatables_style_plugin extends views_plugin_style_table {
       ),
     );
 
-    $form['pages']['processing'] = array(
-      '#type' => 'select',
-      '#title' => t('Processing'),
-      '#default_value' => isset($this->options['pages']['processing']) ? $this->options['pages']['processing'] : 0,
-      '#options' => array(
-        0 => t('Client-side (Default)'),
-        'serverside' => t('Server-side'),
-      ),
-      '#description' => t('Selects which processing should be used.'),
-      '#states' => array(
-        'invisible' => array(
-          ':input[name="style_options[pages][pagination_style]"]' => array('value' => 'no_pagination'),
-        ),
-      ),
+    $form['pages']['preview_limit'] = array(
+      '#type' => 'number',
+      '#title' => t('Rows in the Views preview'),
+      '#description' => t('The preview of the Views editor is reloaded after every change. To keep it fast it only loads this many rows (0 = all). It does not affect the real page.'),
+      '#size' => 10,
+      '#min' => 0,
+      '#default_value' => isset($this->options['pages']['preview_limit']) ? $this->options['pages']['preview_limit'] : 100,
     );
 
     $columns = $this->display->handler->get_field_labels();
@@ -229,5 +242,198 @@ class datatables_style_plugin extends views_plugin_style_table {
         ),
       );
     }
+
+    // Column filters.
+    $form['filters'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Column filters'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+      '#description' => t('Adds a filter below the header of a column. A <em>drop-down</em> lists the distinct values of the column; with server-side processing (AJAX) they are read from the database, limited to the rows that are left by the other filters of the table (like Views Selective Filters). With server-side processing, columns that cannot be filtered in SQL (aggregated fields, formulas, global fields) get no filter.'),
+    );
+    foreach ($columns as $column_name => $column_label) {
+      $form['filters'][$column_name] = array(
+        '#type' => 'select',
+        '#title' => check_plain($column_label),
+        '#default_value' => isset($this->options['filters'][$column_name]) ? $this->options['filters'][$column_name] : 'none',
+        '#options' => array(
+          'none' => t('No filter'),
+          'text' => t('Text box'),
+          'select' => t('Drop-down with distinct values'),
+        ),
+      );
+    }
+    $form['filter_options'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Drop-down filter options'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+    $form['filter_options']['limit'] = array(
+      '#type' => 'number',
+      '#title' => t('Maximum number of values'),
+      '#description' => t('If a column has more distinct values than this, a text box is shown instead of the drop-down.'),
+      '#default_value' => isset($this->options['filter_options']['limit']) ? $this->options['filter_options']['limit'] : 100,
+      '#min' => 1,
+      '#max' => 1000,
+    );
+    $form['filter_options']['cascade'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Only list values that are still possible'),
+      '#description' => t('Server-side processing only. Recalculate the lists after every change, taking into account the other filters and the search box.'),
+      '#default_value' => !empty($this->options['filter_options']['cascade']),
+    );
+  }
+
+  /**
+   * Tells whether DataTables fetches the rows from the server.
+   *
+   * This is derived from the Views settings: the display must use AJAX and
+   * DataTables (not the Views pager) must do the paging. The Views live
+   * preview has no AJAX settings, so it always works client-side.
+   */
+  function is_serverside() {
+    if (!empty($this->view->live_preview)) {
+      return FALSE;
+    }
+    if (!isset($this->options['pages']['pagination_style']) || $this->options['pages']['pagination_style'] === 'no_pagination') {
+      return FALSE;
+    }
+    return !empty($this->view->display_handler) && $this->view->display_handler->use_ajax();
+  }
+
+  /**
+   * Tells whether this request is a DataTables server-side draw.
+   */
+  protected function is_datatables_request() {
+    return !empty($this->view->datatables_request) && $this->view->datatables_role == 'main';
+  }
+
+  /**
+   * Overrides parent::even_empty().
+   *
+   * The table of a server-side DataTable is rendered without rows; DataTables
+   * shows its own messages.
+   */
+  function even_empty() {
+    // Not parent::even_empty(): that one honors the removed table option
+    // "Show the empty text in the table".
+    return $this->is_serverside();
+  }
+
+  /**
+   * Overrides parent::init().
+   */
+  function init(&$view, &$display, $options = NULL) {
+    parent::init($view, $display, $options);
+    // The option "Show the empty text in the table" was removed. Views saved
+    // with it enabled must not use it any more (it breaks searches without
+    // result).
+    $this->options['empty_table'] = FALSE;
+  }
+
+  /**
+   * Returns the sort order requested by DataTables as a list of
+   * array('field' => field id, 'dir' => 'asc'|'desc') for sortable columns.
+   */
+  protected function datatables_order() {
+    $order = array();
+    if (empty($this->view->datatables_request['order'])) {
+      return $order;
+    }
+    foreach ($this->view->datatables_request['order'] as $item) {
+      $id = $item['field'];
+      if (!empty($this->view->field[$id])
+        && !empty($this->options['info'][$id]['sortable'])
+        && $this->view->field[$id]->click_sortable()) {
+        $order[] = $item;
+      }
+    }
+    return $order;
+  }
+
+  /**
+   * Overrides parent::build_sort().
+   *
+   * A sort requested by DataTables replaces the sorts of the View, exactly
+   * like a click on a column header does in a normal table.
+   */
+  function build_sort() {
+    if ($this->datatables_order()) {
+      return FALSE;
+    }
+    return parent::build_sort();
+  }
+
+  /**
+   * Overrides parent::build_sort_post().
+   *
+   * Uses the click_sort() of the field handlers (the Views way to sort a
+   * table column), for as many columns as DataTables asks for.
+   */
+  function build_sort_post() {
+    $order = $this->datatables_order();
+    if (!$order) {
+      parent::build_sort_post();
+      return;
+    }
+    $this->active = $order[0]['field'];
+    $this->order = $order[0]['dir'];
+    foreach ($order as $item) {
+      $this->view->field[$item['field']]->click_sort($item['dir']);
+    }
+  }
+
+  /**
+   * Overrides parent::render().
+   *
+   * For a DataTables request the rows are not themed to HTML; they are turned
+   * into the JSON answer that is sent back by
+   * datatables_views_ajax_data_alter().
+   */
+  function render() {
+    if (!$this->is_datatables_request()) {
+      return parent::render();
+    }
+
+    module_load_include('inc', 'views', 'templates/views.theme');
+    module_load_include('inc', 'datatables', 'datatables.server');
+    $request = $this->view->datatables_request;
+
+    // Use the same code as the table template, so fields that share a column
+    // are combined and classes/excluded fields are handled identically.
+    $vars = array(
+      'view' => $this->view,
+      'rows' => $this->view->result,
+      'options' => $this->options,
+      'title' => '',
+    );
+    template_preprocess_views_view_table($vars);
+
+    $data = array();
+    foreach ($vars['rows'] as $i => $row) {
+      $item = array();
+      foreach ($row as $column => $html) {
+        $item[$column] = (string) $html;
+      }
+      if (!empty($vars['row_classes'][$i]) && is_array($vars['row_classes'][$i])) {
+        $item['DT_RowClass'] = implode(' ', $vars['row_classes'][$i]);
+      }
+      $data[] = $item;
+    }
+
+    $filtered = (int) $this->view->total_rows;
+    $response = array(
+      'draw' => $request['draw'],
+      'recordsTotal' => datatables_server_total_count($this->view, $request),
+      'recordsFiltered' => $filtered,
+      'data' => $data,
+    );
+    if ($request['options']) {
+      $response['filterOptions'] = datatables_server_filter_options($this->view, $request);
+    }
+    $this->view->datatables_response = $response;
+
+    return '';
   }
 }
