@@ -51,6 +51,8 @@ function datatables_server_parse_request(array $raw) {
     'columns' => array(),
     'order' => array(),
     'options' => array(),
+    // The request is an export of all rows, see datatables_views_pre_view().
+    'export' => !empty($raw['export']),
   );
   // DataTables sends -1 for "all records". That defeats the purpose of
   // server-side processing, so the page length is limited.

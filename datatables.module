@@ -498,6 +498,8 @@ function template_preprocess_datatables_view(&$vars) {
     'hideSearch' => empty($options['elements']['search_box']),
     'sticky' => !empty($options['sticky']) && empty($datatable_options['scrollY']) && empty($view->live_preview),
     'stickyOffset' => isset($options['sticky_offset']) ? trim($options['sticky_offset']) : '',
+    // Export buttons fetch all rows from the server (server-side processing).
+    'exportAll' => $serverside && !empty($options['elements']['table_tools']) && (!isset($options['elements']['export_all']) || !empty($options['elements']['export_all'])),
   );
   if ($serverside) {
     // The rows are requested through Backdrop's Views Ajax callback
@@ -536,6 +538,7 @@ function template_preprocess_datatables_view(&$vars) {
     if ($export_buttons) {
       $datatable_options['buttons'][] = [
         'extend' => 'collection',
+        'autoClose' => TRUE,
         'text' => t('Export'),
         'titleAttr' => t('Export data of the table into various formats'),
         'buttons' => array_values($export_buttons),
@@ -688,6 +691,20 @@ function datatables_views_pre_view(&$view, &$display_id, &$args) {
     return;
   }
 
+  // An export of all rows is only honored when the style options allow it;
+  // the number of rows is limited by the style options, never by the request.
+  if ($request['export']) {
+    $export_limit = _datatables_export_limit($view);
+    if ($export_limit > 0) {
+      $request['start'] = 0;
+      $request['length'] = $export_limit;
+      $request['options'] = array();
+    }
+    else {
+      $request['export'] = FALSE;
+    }
+  }
+
   // The request must not leak into exposed input, pagers or sort links.
   unset($_POST['datatables'], $_GET['datatables'], $_REQUEST['datatables']);
 
@@ -698,6 +715,18 @@ function datatables_views_pre_view(&$view, &$display_id, &$args) {
   $view->display_handler->set_option('cache', array('type' => 'none', 'options' => array()));
   // We need the number of matching rows for "recordsFiltered".
   $view->get_total_rows = TRUE;
+}
+
+/**
+ * Returns the maximum number of rows of an export of all rows, 0 if disabled.
+ */
+function _datatables_export_limit($view) {
+  $style_options = $view->display_handler->get_option('style_options');
+  $elements = isset($style_options['elements']) ? $style_options['elements'] : array();
+  if (empty($elements['table_tools']) || (isset($elements['export_all']) && !$elements['export_all'])) {
+    return 0;
+  }
+  return !empty($elements['export_limit']) ? max(1, (int) $elements['export_limit']) : 10000;
 }
 
 /**

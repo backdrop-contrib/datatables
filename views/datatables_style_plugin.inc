@@ -22,6 +22,9 @@ class datatables_style_plugin extends views_plugin_style_table {
         'search_box' => TRUE,
         'table_info' => TRUE,
         'save_state' => FALSE,
+        'table_tools' => FALSE,
+        'export_all' => TRUE,
+        'export_limit' => 10000,
       ),
     );
     $options['layout'] = array(
@@ -122,6 +125,32 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Buttons'),
       '#default_value' => !empty($this->options['elements']['table_tools']),
       '#description' => t('Buttons (successor of Table Tools) is a plugin that adds a powerful button toolbar with copy, save, and print capabilities. Note that if you have custom dom parameter set, Buttons can be included by inserting the "B" character.'),
+    );
+
+    $form['elements']['export_all'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Export all rows (server-side processing only)'),
+      '#default_value' => !isset($this->options['elements']['export_all']) || !empty($this->options['elements']['export_all']),
+      '#description' => t('With server-side processing the table only holds the rows of the current page. When this is enabled, the Export buttons (copy, CSV, Excel, PDF, print) request all rows that match the current search, column filters and sort order from the server. Otherwise only the visible page is exported.'),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="style_options[elements][table_tools]"]' => array('checked' => TRUE),
+        ),
+      ),
+    );
+    $form['elements']['export_limit'] = array(
+      '#type' => 'number',
+      '#title' => t('Maximum number of rows to export'),
+      '#default_value' => isset($this->options['elements']['export_limit']) ? $this->options['elements']['export_limit'] : 10000,
+      '#min' => 1,
+      '#description' => t('Protects the server and the browser: large exports need a lot of memory and time, PDF files in particular. If more rows match, only the first ones are exported and the user is told. This limit is enforced on the server.'),
+      '#element_validate' => array('element_validate_integer_positive'),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="style_options[elements][table_tools]"]' => array('checked' => TRUE),
+          ':input[name="style_options[elements][export_all]"]' => array('checked' => TRUE),
+        ),
+      ),
     );
 
     $form['layout'] = array(
@@ -375,13 +404,31 @@ class datatables_style_plugin extends views_plugin_style_table {
     $order = $this->datatables_order();
     if (!$order) {
       parent::build_sort_post();
+    }
+    else {
+      $this->active = $order[0]['field'];
+      $this->order = $order[0]['dir'];
+      foreach ($order as $item) {
+        $this->view->field[$item['field']]->click_sort($item['dir']);
+      }
+    }
+    $this->add_sort_tiebreaker();
+  }
+
+  /**
+   * Makes the order of rows with equal sort values deterministic.
+   *
+   * Without it the database may return such rows in a different order for
+   * every query, so a page, the next page and an export of all rows (which
+   * uses another LIMIT) can disagree and rows may appear twice or not at all
+   * while paging. The unique key of the base table is added as last sort.
+   */
+  protected function add_sort_tiebreaker() {
+    $view = $this->view;
+    if (!$this->is_datatables_request() || empty($view->query) || !empty($view->query->groupby) || empty($view->base_field)) {
       return;
     }
-    $this->active = $order[0]['field'];
-    $this->order = $order[0]['dir'];
-    foreach ($order as $item) {
-      $this->view->field[$item['field']]->click_sort($item['dir']);
-    }
+    $view->query->add_orderby($view->base_table, $view->base_field, 'ASC');
   }
 
   /**

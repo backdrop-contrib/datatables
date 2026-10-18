@@ -236,11 +236,91 @@
   }
 
   /**
+   * Makes the export buttons export all rows (server-side processing).
+   *
+   * In server-side mode the table only holds the current page, which is all
+   * the Buttons extension can export. The action of each export button is
+   * wrapped: it loads all rows matching the current search, column filters
+   * and sort order (the server limits their number, see the "Maximum number
+   * of rows to export" style option), runs the original action on them
+   * without drawing them, and then reloads the page that was shown before.
+   *
+   * @param {Array} buttons
+   *   The Buttons definitions.
+   * @param {Object} state
+   *   Shared state; createAjax() reads state.exporting.
+   */
+  function exportAllRows(buttons, state) {
+    var names = {copy: 'copyHtml5', csv: 'csvHtml5', excel: 'excelHtml5', pdf: 'pdfHtml5', print: 'print'};
+    return $.map(buttons, function (button) {
+      if (typeof button === 'string') {
+        button = {extend: button};
+      }
+      if (!button || typeof button !== 'object') {
+        return [button];
+      }
+      if ($.isArray(button.buttons)) {
+        button.buttons = exportAllRows(button.buttons, state);
+      }
+      var type = names[button.extend] || button.extend;
+      if ($.inArray(type, ['copyHtml5', 'csvHtml5', 'excelHtml5', 'pdfHtml5', 'print']) === -1) {
+        return [button];
+      }
+      var original = button.action || ($.fn.dataTable.ext.buttons[type] || {}).action;
+      if (typeof original !== 'function') {
+        return [button];
+      }
+      button.action = function (e, dt, node, config, cb) {
+        var self = this;
+        if (state.exporting) {
+          return;
+        }
+        state.exporting = true;
+        state.exportResult = null;
+        // The draw that follows the response holds all rows: export them
+        // there, cancel the draw, and load the previous page again. (The
+        // preDraw event also fires before the request is sent; that one is
+        // ignored, createAjax() sets state.exportResult when the rows are in.)
+        dt.on('preDraw.datatablesExport', function () {
+          if (!state.exportResult) {
+            return;
+          }
+          dt.off('preDraw.datatablesExport');
+          var ok = state.exportResult === 'ok';
+          state.exporting = false;
+          state.exportResult = null;
+          if (ok) {
+            var info = dt.page.info();
+            if (info.recordsDisplay > dt.rows().count()) {
+              dt.buttons.info(
+                Backdrop.t('Export'),
+                Backdrop.t('The table has @total rows. Only the first @count rows are exported.', {'@total': info.recordsDisplay, '@count': dt.rows().count()}),
+                5000
+              );
+            }
+            original.call(self, e, dt, node, config, cb);
+          }
+          setTimeout(function () {
+            dt.ajax.reload(null, false);
+          }, 0);
+          return false;
+        });
+        dt.ajax.reload(null, false);
+      };
+      return [button];
+    });
+  }
+
+  /**
    * Creates the DataTables "ajax" function for server-side processing.
    */
   function createAjax($table, cfg, state) {
     return function (data, callback) {
+      var exporting = state.exporting && !state.exportResult;
       var fail = function (message) {
+        if (exporting) {
+          state.exportResult = 'failed';
+        }
         callback({draw: data.draw, data: [], recordsTotal: 0, recordsFiltered: 0, error: message});
       };
 
@@ -264,9 +344,15 @@
         })
       };
 
+      if (exporting) {
+        // Export of all rows: the server decides how many (style option).
+        request.export = 1;
+        request.start = 0;
+        request.length = -1;
+      }
       // Ask for the lists of the drop-down filters when they are not known
       // yet, or on every draw when they depend on the other filters.
-      if (state.selects.length && (cfg.cascade || !state.optionsLoaded)) {
+      else if (state.selects.length && (cfg.cascade || !state.optionsLoaded)) {
         request.options = state.selects;
       }
 
@@ -302,6 +388,9 @@
           if (state.setOptions) {
             state.setOptions(response.filterOptions);
           }
+        }
+        if (exporting) {
+          state.exportResult = 'ok';
         }
         callback(response);
       }).fail(function (xhr) {
@@ -500,7 +589,10 @@
             options.buttons = exportTitleRowOnly(options.buttons);
           }
 
-          var state = {selects: [], optionsLoaded: false, setOptions: null};
+          var state = {selects: [], optionsLoaded: false, setOptions: null, exporting: false};
+          if (cfg && cfg.serverSide && cfg.exportAll && $.isArray(options.buttons)) {
+            options.buttons = exportAllRows(options.buttons, state);
+          }
           if (cfg && cfg.serverSide) {
             // Known before the first request, which is sent by the constructor.
             $.each(cfg.filters || {}, function (id, type) {
