@@ -30,3 +30,12 @@ table.dataTable.datatables-sticky > thead > tr.datatables-filters > th {
   top: calc(var(--datatables-sticky-top, 0px) + var(--datatables-sticky-row, 0px));
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
 }
+
+/* DataTables 2.1+ forces "display: block" on every child of the table row of
+   the layout, which also shows the hidden "Processing..." indicator forever
+   (it is a child of that row in the layout used with Buttons). DataTables
+   hides it with an inline style; this rule keeps that working. */
+div.dt-container div.dt-layout-table > div.dt-processing[style*="display: none"],
+div.dt-container div.dt-layout-table > div.dt-processing[style*="display:none"] {
+  display: none !important;
+}

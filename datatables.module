@@ -37,11 +37,10 @@ function datatables_library_info() {
     $libraries['datatables'] = array(
       'title' => 'DataTables',
       'website' => 'https://datatables.net/',
-      'version' => '2.0.5',
+      'version' => '2.3.8',
       'js' => array(
         $lib_path . '/dataTables.min.js' => array(),
         $lib_path . '/dataTables.responsive.min.js' => array(),
-//        $lib_path . '/responsive.dataTables.js' => array(), // why???
         $lib_path . '/dataTables.scroller.min.js' => array(),
         backdrop_get_path('module', 'datatables') . '/js/datatables.js' => array(),
       ),
@@ -56,7 +55,7 @@ function datatables_library_info() {
     $libraries['datatables-buttons'] = array(
       'title' => 'Buttons (successor of Tabletools) plugin for DataTables',
       'website' => 'https://datatables.net/extensions/buttons',
-      'version' => '3.0.2',
+      'version' => '3.2.6',
       'js' => array(
         $lib_path . '/dataTables.buttons.js' => array(),
         $lib_path . '/buttons.colVis.js' => array(),
@@ -350,9 +349,6 @@ function template_preprocess_datatables_view(&$vars) {
         if (backdrop_strlen($last_render) != backdrop_strlen(strip_tags($last_render))) {
           $column_options['type'] = 'html';
         }
-        elseif (is_numeric($last_render) || $fields[$field] instanceof views_handler_field_numeric) {
-#not good          $column_options['type'] = 'num-fmt';
-        }
         $column_options['orderable'] = TRUE;
       }
       // Dates: the type "date" would make DataTables put the class
@@ -581,15 +577,6 @@ function template_preprocess_datatables_view(&$vars) {
       'print' => t('Print'),
     ),
   );
-
-/* We do this in Javascript later
-  if ($datatable_options['expandable']) {
-    $datatable_options['responsive'] = ['details' => ['type' => 'column']];
-    $details_column_options = ['title' => '', 'data' => false, 'defaultContent' => '', 'className' => 'dt-control', 'orderable' => false, 'visible' => true];
-    array_unshift($datatable_options['columns'], $details_column_options);
-    $datatable_options['order']['idx']++;
-  }
-*/
 
   // Tell the editor that the preview shows only some of the rows.
   $preview_limit = _datatables_preview_limit($view);

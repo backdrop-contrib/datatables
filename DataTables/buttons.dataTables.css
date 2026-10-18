@@ -119,7 +119,7 @@ div.dt-button-collection .dt-button-active:after {
   margin-top: -10px;
   right: 1em;
   display: inline-block;
-  content: "✓";
+  content: "\2713";
   color: inherit;
 }
 div.dt-button-collection .dt-button-active.dt-button-split {
@@ -137,7 +137,7 @@ div.dt-button-collection .dt-button-active.dt-button-split > *:first-child:after
   margin-top: -10px;
   right: 1em;
   display: inline-block;
-  content: "✓";
+  content: "\2713";
   color: inherit;
 }
 div.dt-button-collection .dt-button-active-a a {
@@ -147,7 +147,7 @@ div.dt-button-collection .dt-button-active-a a:after {
   position: absolute;
   right: 1em;
   display: inline-block;
-  content: "✓";
+  content: "\2713";
   color: inherit;
 }
 div.dt-button-collection span.dt-button-spacer {
@@ -171,11 +171,6 @@ div.dt-button-collection span.dt-button-spacer.bar {
     box-shadow: none !important;
   }
 }
-html.dark div.dt-button-info {
-  background-color: var(--dt-html-background);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
 div.dt-buttons > .dt-button,
 div.dt-buttons > div.dt-button-split .dt-button {
   position: relative;
@@ -194,8 +189,8 @@ div.dt-buttons > div.dt-button-split .dt-button {
   white-space: nowrap;
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.1); /* Fallback */
-  background: linear-gradient(to bottom, rgba(230, 230, 230, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(230, 230, 230, 0.1)", EndColorStr="rgba(0, 0, 0, 0.1)");
+  background: linear-gradient(to bottom, rgba(229.5, 229.5, 229.5, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(229.5, 229.5, 229.5, 0.1)", EndColorStr="rgba(0, 0, 0, 0.1)");
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -215,17 +210,17 @@ div.dt-buttons > div.dt-button-split .dt-button.disabled {
 }
 div.dt-buttons > .dt-button.dt-button-active:not(.disabled),
 div.dt-buttons > div.dt-button-split .dt-button.dt-button-active:not(.disabled) {
-  background-color: rgba(0, 0, 0, 0.1); /* Fallback */
-  background: linear-gradient(to bottom, rgba(179, 179, 179, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(179, 179, 179, 0.1)", EndColorStr="rgba(0, 0, 0, 0.1)");
+  background-color: hsla(0, 0%, -20%, 0.1); /* Fallback */
+  background: linear-gradient(to bottom, rgba(178.5, 178.5, 178.5, 0.1) 0%, hsla(0, 0%, -20%, 0.1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(178.5, 178.5, 178.5, 0.1)", EndColorStr="hsla(0, 0%, -20%, 0.1)");
   box-shadow: inset 1px 1px 3px #999999;
 }
 div.dt-buttons > .dt-button.dt-button-active:not(.disabled):hover:not(.disabled),
 div.dt-buttons > div.dt-button-split .dt-button.dt-button-active:not(.disabled):hover:not(.disabled) {
   box-shadow: inset 1px 1px 3px #999999;
-  background-color: rgba(0, 0, 0, 0.1); /* Fallback */
-  background: linear-gradient(to bottom, rgba(128, 128, 128, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(128, 128, 128, 0.1)", EndColorStr="rgba(0, 0, 0, 0.1)");
+  background-color: hsla(0, 0%, -50%, 0.1); /* Fallback */
+  background: linear-gradient(to bottom, rgba(127.5, 127.5, 127.5, 0.1) 0%, hsla(0, 0%, -50%, 0.1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(127.5, 127.5, 127.5, 0.1)", EndColorStr="hsla(0, 0%, -50%, 0.1)");
 }
 div.dt-buttons > .dt-button:hover,
 div.dt-buttons > div.dt-button-split .dt-button:hover {
@@ -234,9 +229,9 @@ div.dt-buttons > div.dt-button-split .dt-button:hover {
 div.dt-buttons > .dt-button:hover:not(.disabled),
 div.dt-buttons > div.dt-button-split .dt-button:hover:not(.disabled) {
   border: 1px solid #666;
-  background-color: rgba(0, 0, 0, 0.1); /* Fallback */
-  background: linear-gradient(to bottom, rgba(153, 153, 153, 0.1) 0%, rgba(0, 0, 0, 0.1) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(153, 153, 153, 0.1)", EndColorStr="rgba(0, 0, 0, 0.1)");
+  background-color: hsla(0, 0%, -30%, 0.1); /* Fallback */
+  background: linear-gradient(to bottom, rgba(153, 153, 153, 0.1) 0%, hsla(0, 0%, -30%, 0.1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr="rgba(153, 153, 153, 0.1)", EndColorStr="hsla(0, 0%, -30%, 0.1)");
 }
 div.dt-buttons > .dt-button:focus:not(.disabled),
 div.dt-buttons > div.dt-button-split .dt-button:focus:not(.disabled) {
@@ -307,8 +302,10 @@ div.dt-button-collection .dt-button {
   left: 0;
   right: 0;
   width: 100%;
-  display: block;
+  display: flex;
   float: none;
+  justify-content: space-between;
+  align-items: center;
   background: none;
   margin: 0;
   padding: 0.5em 1em;
@@ -329,6 +326,9 @@ div.dt-button-collection .dt-button:hover:not(.disabled) {
   border: none;
   background: rgba(153, 153, 153, 0.1);
   box-shadow: none;
+}
+div.dt-button-collection .dt-button:focus {
+  outline-offset: -2px;
 }
 div.dt-button-collection div.dt-button-split {
   display: flex;
@@ -397,10 +397,6 @@ div.dt-button-collection.fixed > :last-child {
 }
 div.dt-button-collection.two-column > :last-child, div.dt-button-collection.three-column > :last-child, div.dt-button-collection.four-column > :last-child {
   display: block !important;
-  -webkit-column-gap: 8px;
-  -moz-column-gap: 8px;
-  -ms-column-gap: 8px;
-  -o-column-gap: 8px;
   column-gap: 8px;
 }
 div.dt-button-collection.two-column > :last-child > *, div.dt-button-collection.three-column > :last-child > *, div.dt-button-collection.four-column > :last-child > * {
@@ -527,17 +523,17 @@ html.dark div.dt-buttons > div.dt-button-split .dt-button {
 }
 html.dark div.dt-buttons > .dt-button.dt-button-active:not(.disabled),
 html.dark div.dt-buttons > div.dt-button-split .dt-button.dt-button-active:not(.disabled) {
-  background: rgba(179, 179, 179, 0.15);
+  background: rgba(178.5, 178.5, 178.5, 0.15);
   box-shadow: inset 1px 1px 2px black;
 }
 html.dark div.dt-buttons > .dt-button.dt-button-active:not(.disabled):hover:not(.disabled),
 html.dark div.dt-buttons > div.dt-button-split .dt-button.dt-button-active:not(.disabled):hover:not(.disabled) {
-  background: rgba(128, 128, 128, 0.15);
+  background: rgba(127.5, 127.5, 127.5, 0.15);
   box-shadow: inset 1px 1px 3px black;
 }
 html.dark div.dt-buttons > .dt-button:hover:not(.disabled),
 html.dark div.dt-buttons > div.dt-button-split .dt-button:hover:not(.disabled) {
-  background: rgba(179, 179, 179, 0.15);
+  background: rgba(178.5, 178.5, 178.5, 0.15);
 }
 html.dark div.dt-buttons > .dt-button:focus:not(.disabled),
 html.dark div.dt-buttons > div.dt-button-split .dt-button:focus:not(.disabled) {
@@ -556,4 +552,8 @@ html.dark div.dt-button-collection {
   border: 1px solid rgba(255, 255, 255, 0.15);
   background-color: rgb(33, 37, 41);
   box-shadow: 3px 4px 10px 1px rgba(0, 0, 0, 0.8);
+}
+html.dark div.dt-button-info {
+  background-color: var(--dt-html-background);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }

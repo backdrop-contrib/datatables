@@ -1,8 +1,6 @@
 # DataTables
 
-This module provides Views integration for the DataTables library, whichprovides advanced interaction controls to HTML tables such as dynamicpagination, on-the-fly filtering, and column sorting.
-
-In contrast to the Drupal module, which used DataTables v1.9 from 2012, theBackdrop module uses v2 from 2024.
+This module provides Views integration for the DataTables library, which provides advanced interaction controls to HTML tables such as dynamic pagination, on-the-fly filtering, and column sorting.
 
 Version 2.1 of this module introduces two useful features of DataTables:
 
@@ -31,7 +29,7 @@ Whether DataTables works in the browser or asks the server for every page isderi
 
 With server-side processing every page, sort and search request is sent toBackdrop's own Views Ajax callback (`views/ajax`).Views therefore performs the access check of the display, applies contextualarguments and exposed filters, and the rows are rendered by the same code asthe normal table (combined columns, excluded fields, row classes).
 
-Notes:
+### Notes:
 
 - Set **Caching: None** on the display. Server-side requests ignore the Viewscache.
 - Sorting uses the `click_sort()` of the field handlers, so only columns thatare "sortable" in the style settings and click-sortable can be ordered.
@@ -39,7 +37,7 @@ Notes:
 - At most 1000 rows are returned per request; "All" is not offered in thelength menu.
 - The exposed filters of the view keep working: submitting the exposed formre-renders the view through Views Ajax, and the new filter values are sentalong with every following DataTables request.
 
-Views preview
+### Views preview
 
 The preview of the Views editor is reloaded after every change and alwaysworks client-side. To keep it fast it only loads the number of rows set under*Pagination and Page Length: Rows in the Views preview* (default 100, 0 = all);a caption tells when rows were left out. The real page is not affected. If itis still too slow, switch off *Auto preview* below the view settings.
 
@@ -77,11 +75,15 @@ Among columns of the same priority the right-most is hidden first. A column set 
 Client-side sorting uses the raw value of the date (written to the cells as `data-order`), so it is independent of the date format. The alignment of the style settings applies.
 
 ## Differences from Drupal 7
-- The DataTables library version 2.0.5 is alreay packaged with this module and does not need to be installed separately.
+- In contrast to the Drupal module, which used DataTables v1.9 from 2012, theBackdrop module uses DataTables v2.x.
+- The DataTables library and used extensions are already packaged with this module and do not need to be installed separately.
 - DataTables requires jQuery 1.7 or newer which is already included in Backdrop.
-- The following DataTables extensions are also included:
-  * Buttons 3.0.2 (successor of TableTools)
-  * Responsive 3.0.2
+
+## DataTables library and extensions
+
+- DataTables version 2.3.8 and the following extensions are included:
+- Buttons 3.2.6 (successor of TableTools)
+- Responsive 3.0.8
 
 ## Issues
 
@@ -95,11 +97,13 @@ Bugs and feature requests should be reported in [the Issue Queue](https://github
 ## Credits
 
 - Ported to Backdrop CMS by [Alex Höbart](https://github.com/AlexHoebart-ICPDR).
-- Originally written for Drupal by [Jon Duell](https://www.drupal.org/u/duellj),[dqd](https://www.drupal.org/u/dqd), [Mitch Portier (Arkener)](https://www.drupal.org/u/arkener).
+- Originally written for Drupal by [Jon Duell](https://www.drupal.org/u/duellj), [dqd](https://www.drupal.org/u/dqd), [Mitch Portier (Arkener)](https://www.drupal.org/u/arkener).
 - Based on DataTables written by [Allan Jardine/SpryMedia](https://sprymedia.co.uk/about).
 
 ## License
 
-This project is GPL v2 software.See the LICENSE.txt file in this directory for complete text.The DataTables library is available under the [MIT license](https://www.datatables.net/license/mit).
+This project is GPL v2 software. See the LICENSE.txt file in this directory for complete text. 
+
+The DataTables library is available under the [MIT license](https://www.datatables.net/license/mit).
 
  
