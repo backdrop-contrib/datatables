@@ -532,12 +532,15 @@ function template_preprocess_datatables_view(&$vars) {
       'text' => t('Columns'),
       'titleAttr' => t('Show/hide columns')
     ];
-    $datatable_options['buttons'][] = [
-      'extend' => 'collection',
-      'text' => t('Export'),
-      'titleAttr' => t('Export data of the table into various formats'),
-      'buttons' => ['copy', 'csv', 'excel', 'pdf', 'print']
-    ];
+    $export_buttons = datatables_export_buttons($view);
+    if ($export_buttons) {
+      $datatable_options['buttons'][] = [
+        'extend' => 'collection',
+        'text' => t('Export'),
+        'titleAttr' => t('Export data of the table into various formats'),
+        'buttons' => array_values($export_buttons),
+      ];
+    }
 
     // If a custom dom parameter is passed, assume that "B" is added, otherwise
     // add it manually.
@@ -598,8 +601,37 @@ function template_preprocess_datatables_view(&$vars) {
   $vars['classes'][] = 'display';
   $vars['classes'][] = 'nowrap';  // recommended for responsive tables
 
+  // Let other modules change any DataTables option of this view.
+  backdrop_alter('datatables_options', $datatable_options, $view);
+
   backdrop_add_library('datatables', 'datatables');
   backdrop_add_js(array('datatables' => array('#' . $vars['id'] => $datatable_options)), array('type' => 'setting', 'scope' => JS_DEFAULT));
+}
+
+/**
+ * Returns the definitions of the buttons of the "Export" menu.
+ *
+ * The result is keyed by button name (copy, csv, excel, pdf, print); every
+ * value is the configuration of a DataTables button, see
+ * https://datatables.net/extensions/buttons/ for the options of each button.
+ * The page title is not written as first row/line to the copy and Excel
+ * output.
+ *
+ * @param view $view
+ *   The view that is displayed.
+ *
+ * @see hook_datatables_export_buttons_alter()
+ */
+function datatables_export_buttons($view) {
+  $buttons = array(
+    'copy' => array('extend' => 'copy', 'title' => ''),
+    'csv' => array('extend' => 'csv'),
+    'excel' => array('extend' => 'excel', 'title' => ''),
+    'pdf' => array('extend' => 'pdf'),
+    'print' => array('extend' => 'print'),
+  );
+  backdrop_alter('datatables_export_buttons', $buttons, $view);
+  return $buttons;
 }
 
 /**

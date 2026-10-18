@@ -74,6 +74,28 @@ Among columns of the same priority the right-most is hidden first. A column set 
 
 Client-side sorting uses the raw value of the date (written to the cells as `data-order`), so it is independent of the date format. The alignment of the style settings applies.
 
+## Export buttons and options for developers
+
+With the style option *Buttons* enabled, the **Export** menu offers Copy, CSV, Excel, PDF and Print. In contrast to DataTables' default, the page title is not written
+by default as first row/line to the Copy and Excel output.
+
+
+Modules can change the buttons with `hook_datatables_export_buttons_alter()` (see `datatables.api.php`). The hook receives the button definitions keyed by `copy`, `csv`, `excel`, `pdf` and `print`; every value holds the options documented for that button, e.g. at [https://datatables.net/reference/button/excel](https://datatables.net/reference/button/excel). Unset a key to remove a button, add a key to offer another one.
+
+```php
+function mymodule_datatables_export_buttons_alter(array &$buttons, $view) {  
+  if ($view->name == 'my_table') {  
+    $buttons['pdf']['orientation'] = 'landscape';  
+    $buttons['excel']['title'] = '*';  // page title as first row again  
+    $buttons['excel']['filename'] = 'my-table';  
+  }  
+}
+```
+
+Options that are JavaScript functions (e.g. `customize`) cannot be written in PHP. Give the name of a global function with the prefix `js:`, e.g. `$buttons['pdf']['customize'] = 'js:Backdrop.myModule.pdfCustomize';`. The function must exist when the table is built, for instance in a file added with `backdrop_add_js()` and `'group' => JS_LIBRARY`. This works for every option of the table, not only for buttons.
+
+`hook_datatables_options_alter()` receives all options of a table (columns, paging, language, buttons, ...) to change anything else.
+
 ## Differences from Drupal 7
 - In contrast to the Drupal module, which used DataTables v1.9 from 2012, theBackdrop module uses DataTables v2.x.
 - The DataTables library and used extensions are already packaged with this module and do not need to be installed separately.
@@ -102,7 +124,7 @@ Bugs and feature requests should be reported in [the Issue Queue](https://github
 
 ## License
 
-This project is GPL v2 software. See the LICENSE.txt file in this directory for complete text. 
+This project is GPL v2 software. See the LICENSE.txt file in this directory for complete text.
 
 The DataTables library is available under the [MIT license](https://www.datatables.net/license/mit).
 

@@ -171,6 +171,36 @@
   }
 
   /**
+   * Replaces "js:Some.function.name" strings in the options by the function.
+   *
+   * PHP cannot pass functions to JavaScript; the options of a table (e.g. the
+   * "customize" callback of a button) can name a function instead, see
+   * hook_datatables_export_buttons_alter(). Only functions that exist as
+   * global names are used.
+   */
+  function resolveCallbacks(value) {
+    if (typeof value === 'string' && value.indexOf('js:') === 0) {
+      var target = window;
+      $.each(value.substr(3).split('.'), function (i, part) {
+        target = target ? target[part] : undefined;
+      });
+      if (typeof target !== 'function') {
+        if (window.console) {
+          window.console.warn('DataTables: function ' + value.substr(3) + ' not found.');
+        }
+        return undefined;
+      }
+      return target;
+    }
+    if ($.isArray(value) || $.isPlainObject(value)) {
+      $.each(value, function (key, item) {
+        value[key] = resolveCallbacks(item);
+      });
+    }
+    return value;
+  }
+
+  /**
    * Keeps the filter row out of exports (copy, CSV, Excel, PDF, print).
    *
    * The Buttons extension exports every header row of the table; the second
@@ -188,7 +218,7 @@
       if ($.isArray(button.buttons)) {
         button.buttons = exportTitleRowOnly(button.buttons);
       }
-      if ($.inArray(button.extend, ['copy', 'csv', 'excel', 'pdf', 'print']) !== -1) {
+      if ($.inArray(button.extend, ['copy', 'copyHtml5', 'csv', 'csvHtml5', 'excel', 'excelHtml5', 'pdf', 'pdfHtml5', 'print']) !== -1) {
         var exportOptions = $.extend({}, button.exportOptions);
         var customize = exportOptions.customizeData;
         exportOptions.customizeData = function (data) {
@@ -453,6 +483,7 @@
           var options = $.extend(true, {}, settings.datatables[selector]);
           var cfg = options.backdrop || null;
           delete options.backdrop;
+          resolveCallbacks(options);
 
           options.responsive = true;
 
