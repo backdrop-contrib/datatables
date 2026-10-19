@@ -312,6 +312,216 @@
   }
 
   /**
+   * Keeps the address bar in sync with the state of the table.
+   *
+   * Used when the display has "AJAX history" enabled (like Backdrop does for
+   * the exposed filters, pager and sort links of an Ajax View). The search,
+   * column filters, sort order, page and page length of the table are written
+   * to the query string, and read back when the page is loaded, so a copied
+   * URL shows the same table. The parameters are:
+   *  - dt_q: global search,
+   *  - dt_s: sort order, e.g. "title:asc,type:desc" (field ids),
+   *  - dt_c: the visible columns (field ids), chosen with the Columns button,
+   *  - dt_p: page number (1 = first page),
+   *  - dt_l: page length,
+   *  - dt_f[field_id]: column filter value.
+   * Parameters are only present when they differ from the defaults. The
+   * address bar is replaced, no history entries are added.
+   */
+  var historyRestored = {};
+
+  /**
+   * The default sort of the options as "column:dir,..." text; DataTables
+   * accepts several notations for the "order" option.
+   */
+  function orderText(order, options) {
+    if (!order) {
+      return '';
+    }
+    if ($.isPlainObject(order)) {
+      order = [order];
+    }
+    var columns = options.columns || [];
+    return $.map(order, function (o) {
+      var idx = $.isArray(o) ? o[0] : (o ? o.idx : undefined);
+      var dir = $.isArray(o) ? o[1] : (o && o.dir) || 'asc';
+      return columns[idx] && typeof columns[idx].data === 'string' ? columns[idx].data + ':' + dir : null;
+    }).join(',');
+  }
+
+  /**
+   * The ids of the columns that are visible by default, as comma list.
+   */
+  function visibleText(options) {
+    return $.map(options.columns || [], function (column) {
+      return column && typeof column.data === 'string' && column.visible !== false ? column.data : null;
+    }).join(',');
+  }
+
+  function historyEnabled($table, cfg) {
+    var view = getViewSettings($table);
+    return !!(cfg && cfg.serverSide && view && view.enable_ajax_history && window.history && window.history.replaceState && window.URLSearchParams);
+  }
+
+  function fieldColumns(options) {
+    var map = {};
+    $.each(options.columns || [], function (i, column) {
+      if (column && typeof column.data === 'string') {
+        map[column.data] = i;
+      }
+    });
+    return map;
+  }
+
+  function historyParamsOf(table, options, fields) {
+    var ids = [];
+    $.each(options.columns || [], function (i, column) {
+      ids[i] = column && typeof column.data === 'string' ? column.data : null;
+    });
+    var params = {};
+    var search = table.search();
+    if (search) {
+      params.dt_q = search;
+    }
+    params.dt_s = $.map(table.order(), function (o) {
+      return ids[o[0]] ? ids[o[0]] + ':' + o[1] : null;
+    }).join(',');
+    var info = table.page.info();
+    if (info.page > 0) {
+      params.dt_p = String(info.page + 1);
+    }
+    params.dt_l = String(info.length);
+    params.columns = [];
+    params.filters = {};
+    table.columns().every(function () {
+      if (ids[this.index()] && this.visible()) {
+        params.columns.push(ids[this.index()]);
+      }
+      var value = this.search();
+      if (value && ids[this.index()]) {
+        params.filters[ids[this.index()]] = value;
+      }
+    });
+    return params;
+  }
+
+  /**
+   * Reads the table state from the URL into the DataTables options.
+   *
+   * @return {Object}
+   *   The defaults (order, page length) the options had before.
+   */
+  function restoreFromHistory(options) {
+    var fields = fieldColumns(options);
+    var defaults = {
+      order: orderText(options.order, options),
+      length: options.pageLength || 10,
+      columns: visibleText(options)
+    };
+    var query = new URLSearchParams(window.location.search);
+    var found = false;
+
+    if (query.has('dt_q')) {
+      options.search = {search: query.get('dt_q')};
+      found = true;
+    }
+    if (query.has('dt_s')) {
+      var order = [];
+      $.each(query.get('dt_s').split(','), function (i, item) {
+        var parts = item.split(':');
+        if (fields.hasOwnProperty(parts[0]) && (parts[1] === 'asc' || parts[1] === 'desc')) {
+          order.push([fields[parts[0]], parts[1]]);
+        }
+      });
+      options.order = order;
+      found = true;
+    }
+    var length = parseInt(query.get('dt_l'), 10);
+    var menu = options.lengthMenu || [];
+    var allowed = $.map(menu, function (m) { return $.isPlainObject(m) ? m.value : m; });
+    if (length > 0 && $.inArray(length, allowed) !== -1) {
+      options.pageLength = length;
+      found = true;
+    }
+    var page = parseInt(query.get('dt_p'), 10);
+    if (page > 1) {
+      options.displayStart = (page - 1) * (options.pageLength || 10);
+      found = true;
+    }
+    if (query.has('dt_c')) {
+      // The columns that were visible; every other column is hidden.
+      var shown = query.get('dt_c').split(',');
+      var count = 0;
+      $.each(options.columns || [], function (i, column) {
+        if (column && typeof column.data === 'string' && $.inArray(column.data, shown) !== -1) {
+          count++;
+        }
+      });
+      if (count > 0) {
+        $.each(options.columns || [], function (i, column) {
+          if (column && typeof column.data === 'string') {
+            column.visible = $.inArray(column.data, shown) !== -1;
+          }
+        });
+        found = true;
+      }
+    }
+    var columns = options.columns || [];
+    query.forEach(function (value, key) {
+      var match = key.match(/^dt_f\[(.+)\]$/);
+      if (match && fields.hasOwnProperty(match[1])) {
+        options.searchCols = options.searchCols || [];
+        for (var i = 0; i < columns.length; i++) {
+          options.searchCols[i] = options.searchCols[i] || null;
+        }
+        options.searchCols[fields[match[1]]] = {search: value};
+        found = true;
+      }
+    });
+    if (found) {
+      // The URL is the state that was asked for.
+      options.stateSave = false;
+    }
+    return defaults;
+  }
+
+  function writeHistory(table, options, defaults) {
+    var params = historyParamsOf(table, options);
+    var url = new URL(window.location.href);
+    var query = url.searchParams;
+    var remove = [];
+    query.forEach(function (value, key) {
+      if (/^dt_(q|s|p|l|c)$/.test(key) || /^dt_f\[/.test(key)) {
+        remove.push(key);
+      }
+    });
+    $.each(remove, function (i, key) { query.delete(key); });
+    if (params.dt_q) {
+      query.set('dt_q', params.dt_q);
+    }
+    if (params.dt_s !== defaults.order) {
+      query.set('dt_s', params.dt_s);
+    }
+    if (params.dt_p) {
+      query.set('dt_p', params.dt_p);
+    }
+    if (params.columns.join(',') !== defaults.columns) {
+      query.set('dt_c', params.columns.join(','));
+    }
+    // With Scroller the page length is derived from the height of the table.
+    if (!options.scroller && parseInt(params.dt_l, 10) !== parseInt(defaults.length, 10)) {
+      query.set('dt_l', params.dt_l);
+    }
+    $.each(params.filters, function (id, value) {
+      query.set('dt_f[' + id + ']', value);
+    });
+    var target = url.pathname + (query.toString() ? '?' + query.toString() : '') + url.hash;
+    if (target !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(window.history.state, document.title, target);
+    }
+  }
+
+  /**
    * Creates the DataTables "ajax" function for server-side processing.
    */
   function createAjax($table, cfg, state) {
@@ -605,7 +815,27 @@
             options.ajax = createAjax($table, cfg, state);
           }
 
+          // Table state in the URL (display option "AJAX history"). Only the
+          // first load of a page reads it: when the View is reloaded after an
+          // exposed filter changed, the table starts again from the defaults.
+          var historyDefaults = null;
+          if (historyEnabled($table, cfg)) {
+            var historyKey = getViewSettings($table).view_name + ':' + getViewSettings($table).view_display_id;
+            historyDefaults = historyRestored[historyKey] ? {
+              order: orderText(options.order, options),
+              length: options.pageLength || 10,
+              columns: visibleText(options)
+            } : restoreFromHistory(options);
+            historyRestored[historyKey] = true;
+          }
+
           var table = $table.DataTable(options);
+
+          if (historyDefaults) {
+            table.on('draw column-visibility', function () {
+              writeHistory(table, options, historyDefaults);
+            });
+          }
 
           if (cfg && !$.isEmptyObject(cfg.filters)) {
             attachFilters(table, $table, cfg, state);

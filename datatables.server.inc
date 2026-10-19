@@ -110,6 +110,7 @@ function datatables_server_exposed_input($view) {
   foreach (array(
     'datatables', 'page', 'q', 'form_build_id', 'form_token', 'form_id', 'op',
     'ajax_html_ids', 'ajax_page_state', 'order', 'sort',
+    'dt_q', 'dt_s', 'dt_p', 'dt_l', 'dt_c', 'dt_f',
     '_triggering_element_name', '_triggering_element_value',
   ) as $key) {
     unset($input[$key]);

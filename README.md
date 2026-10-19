@@ -74,21 +74,31 @@ Among columns of the same priority the right-most is hidden first. A column set 
 
 Client-side sorting uses the raw value of the date (written to the cells as `data-order`), so it is independent of the date format. The alignment of the style settings applies.
 
+## AJAX history (table state in the URL)
+
+When the View display has *AJAX history* enabled (Advanced settings, next to *Use AJAX*), a server-side DataTable keeps its state in the address bar, so a copied URL opens the same table: the search, the column filters, the sort order, the page, the page length and the visible columns. The parameters are `dt_q` (search), `dt_s` (sort, e.g. `title:asc,type:desc`), `dt_p` (page), `dt_l` (page length), `dt_c` (the visible columns, as chosen with the *Columns* button) and `dt_f[field]` (column filter), and only appear when they differ from the defaults. The address bar is updated in place; no browser history entries are added. The parameters of exposed filters are handled by Views as before. Use only one DataTable with AJAX history per page.
+
+## Exporting all rows (server-side processing)
+
+With server-side processing the table only holds the rows of the current page. Unless disabled, the Export buttons (Copy, CSV, Excel, PDF, Print) therefore ask the server for **all rows that match the current search, column filters and sort order**, export them, and show the previous page again.
+
+- Style option *Export all rows (server-side processing only)* (Buttons section, enabled by default). When disabled, only the visible page is exported.
+- Style option *Maximum number of rows to export* (default 10000). The limit is enforced on the server. If more rows match, the first ones are exported and the user gets a notice. Keep it moderate: PDF files in particular get slow and large.
+- Client-side tables always export all matching rows; nothing changes there.
+
 ## Export buttons and options for developers
 
-With the style option *Buttons* enabled, the **Export** menu offers Copy, CSV, Excel, PDF and Print. In contrast to DataTables' default, the page title is not written
-by default as first row/line to the Copy and Excel output.
-
+With the style option *Buttons* enabled, the **Export** menu offers Copy, CSV, Excel, PDF and Print. In contrast to DataTables' default, the page title is not writtenby default as first row/line to the Copy and Excel output.
 
 Modules can change the buttons with `hook_datatables_export_buttons_alter()` (see `datatables.api.php`). The hook receives the button definitions keyed by `copy`, `csv`, `excel`, `pdf` and `print`; every value holds the options documented for that button, e.g. at [https://datatables.net/reference/button/excel](https://datatables.net/reference/button/excel). Unset a key to remove a button, add a key to offer another one.
 
 ```php
-function mymodule_datatables_export_buttons_alter(array &$buttons, $view) {  
-  if ($view->name == 'my_table') {  
-    $buttons['pdf']['orientation'] = 'landscape';  
-    $buttons['excel']['title'] = '*';  // page title as first row again  
-    $buttons['excel']['filename'] = 'my-table';  
-  }  
+function mymodule_datatables_export_buttons_alter(array &$buttons, $view) {    
+  if ($view->name == 'my_table') {    
+    $buttons['pdf']['orientation'] = 'landscape';    
+    $buttons['excel']['title'] = '*';  // page title as first row again    
+    $buttons['excel']['filename'] = 'my-table';    
+  }    
 }
 ```
 
