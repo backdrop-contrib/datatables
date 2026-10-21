@@ -73,5 +73,13 @@ function hook_datatables_options_alter(array &$options, $view) {
   if ($view->name == 'my_table') {
     $options['pageLength'] = 50;
     $options['language']['search'] = t('Find:');
+    // Move the elements around with the "layout" option (not set when the
+    // deprecated "dom" option of the style is used), e.g. buttons at the left
+    // and the information below the table at the right.
+    // https://datatables.net/reference/option/layout
+    $options['layout']['topStart'] = 'buttons';
+    $options['layout']['topEnd'] = 'search';
+    $options['layout']['bottomStart'] = 'paging';
+    $options['layout']['bottomEnd'] = 'info';
   }
 }

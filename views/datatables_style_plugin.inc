@@ -171,7 +171,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#type' => 'textfield',
       '#title' => t('Set dom Initialization Parameter (Deprecated)'),
       '#default_value' => $this->options['layout']['sdom'],
-      '#description' => t("Use the dom parameter to rearrange the interface elements. See the <a href='@sdom_documentation_url'>Datatables dom documentation</a> for details on how to use this feature", array('@sdom_documentation_url' => 'https://datatables.net/reference/option/dom')),
+      '#description' => t("Deprecated, kept for existing views. The interface elements are positioned with the <a href='@layout_url'>layout option</a> of DataTables, which modules can change with hook_datatables_options_alter(). If this field is set, the layout option is not used and the string has to contain <em>B</em> for the Buttons. See the <a href='@sdom_documentation_url'>Datatables dom documentation</a>.", array('@layout_url' => 'https://datatables.net/reference/option/layout', '@sdom_documentation_url' => 'https://datatables.net/reference/option/dom')),
     );
 
     $form['pages'] = array(

@@ -556,12 +556,18 @@ function template_preprocess_datatables_view(&$vars) {
       ];
     }
 
-    // If a custom dom parameter is passed, assume that "B" is added, otherwise
-    // add it manually.
+    // Search at the left and the buttons at the right of the top row (the
+    // page length is a button). Unless the deprecated "dom" option is set,
+    // which then has to contain "B" itself, the position of the toolbar is
+    // given by the "layout" option; it can be changed in
+    // hook_datatables_options_alter().
     if (!$options['layout']['sdom']) {
-      $datatable_options['dom'] = '<"dt-layout-row"<"dt-layout-cell dt-start"f><"dt-layout-cell dt-end"B>>
-        <"dt-layout-row dt-layout-table"rt>
-        <"dt-layout-row"<"dt-layout-cell dt-start"i><"dt-layout-cell dt-end"p>>';
+      $datatable_options['layout'] = array(
+        'topStart' => 'search',
+        'topEnd' => 'buttons',
+        'bottomStart' => 'info',
+        'bottomEnd' => 'paging',
+      );
     }
     backdrop_add_library('datatables', 'datatables-buttons');
   }
