@@ -312,6 +312,54 @@
   }
 
   /**
+   * Makes a Scroller table use the height of the window down to its bottom.
+   *
+   * CSS alone cannot know how much room the elements above and below the
+   * table need, so the height is measured: the space between the top of the
+   * table body and the bottom of the window, minus the parts of the DataTables
+   * layout below the body (info line, ...) and the margin given in the style
+   * options. It is calculated again when the window or the layout changes.
+   */
+  function fillHeight(table, margin) {
+    var settings = table.settings()[0];
+    var container = $(table.table().container());
+    var pending = false;
+
+    function apply() {
+      pending = false;
+      var $body = container.find('div.dt-scroll-body').first();
+      if (!$body.length) {
+        return;
+      }
+      // Everything of the table that follows the scrolling body (info line,
+      // paging, spacing).
+      var below = Math.max(0, container[0].getBoundingClientRect().bottom - $body[0].getBoundingClientRect().bottom);
+      // Position in the document, independent of the scroll position.
+      var top = $body[0].getBoundingClientRect().top + window.pageYOffset;
+      var height = Math.max(120, Math.floor(window.innerHeight - top - below - margin));
+      if (settings.oScroll.sY === height + 'px') {
+        return;
+      }
+      settings.oScroll.sY = height + 'px';
+      $body.css({height: height + 'px', maxHeight: height + 'px'});
+      if (table.scroller) {
+        table.scroller.measure();
+      }
+    }
+
+    function schedule() {
+      if (!pending) {
+        pending = true;
+        window.requestAnimationFrame(apply);
+      }
+    }
+
+    apply();
+    $(window).on('resize.datatablesFill', schedule);
+    table.on('draw column-visibility responsive-resize', schedule);
+  }
+
+  /**
    * Keeps the address bar in sync with the state of the table.
    *
    * Used when the display has "AJAX history" enabled (like Backdrop does for
@@ -855,6 +903,9 @@
             else {
               $(window).one('load', remeasure);
             }
+          }
+          if (cfg && cfg.fillHeight !== null && cfg.fillHeight !== undefined && table.scroller) {
+            fillHeight(table, cfg.fillHeight);
           }
           if (cfg && cfg.sticky) {
             var updateSticky = stickyHeader($table, cfg.stickyOffset);

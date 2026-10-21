@@ -453,8 +453,17 @@ function template_preprocess_datatables_view(&$vars) {
     case 'scroller':
       $datatable_options['scroller'] = TRUE;
       $datatable_options['deferRender'] = TRUE;
-      $datatable_options['scrollY'] = is_numeric($options['pages']['vheight']) ? $options['pages']['vheight'] . 'px' : $options['pages']['vheight'];
+      $vheight = trim($options['pages']['vheight']);
+      if (preg_match('/^fill(?:\s+(\d+)(?:px)?)?$/i', $vheight, $match)) {
+        // "fill [margin]": js/datatables.js sets the height so that the table
+        // ends at the bottom of the window. Start with a usable height.
+        $fill_height = isset($match[1]) ? (int) $match[1] : 20;
+        $vheight = '300px';
+      }
+      $datatable_options['scrollY'] = is_numeric($vheight) ? $vheight . 'px' : $vheight;
       $datatable_options['scrollCollapse'] = TRUE; // force height given in scrollY
+      // The number of rows follows from the height of the table.
+      $datatable_options['lengthChange'] = FALSE;
       break;
 
     case 'no_pagination':
@@ -498,6 +507,8 @@ function template_preprocess_datatables_view(&$vars) {
     'hideSearch' => empty($options['elements']['search_box']),
     'sticky' => !empty($options['sticky']) && empty($datatable_options['scrollY']) && empty($view->live_preview),
     'stickyOffset' => isset($options['sticky_offset']) ? trim($options['sticky_offset']) : '',
+    // Scroller: space to keep free below the table, NULL for a fixed height.
+    'fillHeight' => isset($fill_height) ? $fill_height : NULL,
     // Export buttons fetch all rows from the server (server-side processing).
     'exportAll' => $serverside && !empty($options['elements']['table_tools']) && (!isset($options['elements']['export_all']) || !empty($options['elements']['export_all'])),
   );

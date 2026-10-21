@@ -197,7 +197,7 @@ class datatables_style_plugin extends views_plugin_style_table {
     $form['pages']['vheight'] = array(
       '#type' => 'textfield',
       '#title' => t('Vertical height'),
-      '#description' => t('Vertical height as any CSS unit, or a number in pixels.'),
+      '#description' => t('Height of the table body, as any CSS length (e.g. <code>400px</code>, <code>calc(100vh - 300px)</code>) or a number in pixels. Use <code>fill</code> to use all the height of the window down to the bottom, or <code>fill 40</code> to keep 40 pixels free below the table (default 20). Needed space below the table, such as a footer, belongs in that number.'),
       '#size'=> 15,
       '#default_value' => isset($this->options['pages']['vheight']) ? $this->options['pages']['vheight'] : '300',
       '#states' => array(
