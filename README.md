@@ -33,7 +33,7 @@ With server-side processing every page, sort and search request is sent to Backd
 
 - Set **Caching: None** on the display. Server-side requests ignore the Views cache.
 - Sorting uses the `click_sort()` of the field handlers, so only columns that are "sortable" in the style settings and click-sortable can be ordered.
-- Global search (search box) and column filters are applied with SQL `LIKE` /`=` on the real database column of each field. Columns that have no suchcolumn (global fields, Field API fields, custom text) are not searched.
+- Global search (search box) and column filters are applied with SQL `LIKE` /`=` on the real database column of each field; see *Search with server-side processing* below. Columns that have no such column (global fields, aggregated fields, formulas, links) are not searched.
 - At most 1000 rows are returned per request; "All" is not offered in the length menu.
 - The exposed filters of the view keep working: submitting the exposed form re-renders the view through Views Ajax, and the new filter values are sent along with every following DataTables request.
 
@@ -48,7 +48,7 @@ Under *Column filters* in the style settings each column can get a filter in a s
 - Client-side processing: the values are read from the table.
 - Server-side processing: the values are read from the database with the query of the view itself (as a derived table), so they work for any Views base table. With *Only list values that are still possible* the list contains only values that exist in the rows left by the exposed filters, contextual arguments, the other column filters and the search box. The column's own filter is ignored, so the user can select another option.
 - If a column has more distinct values than the configured maximum, a text box is shown instead.
-- Searchable and filterable are columns that read a plain database column and Field API fields (their main column, joined only when a search or filter on it is requested). With server-side processing, columns that cannot be filtered in SQL (aggregated fields, formulas, global fields) get no filter control.
+- Searchable and filterable are columns that read a plain database column and Field API fields (their main column, joined only when a search or filter on it is requested). With server-side processing, columns that cannot be filtered in SQL (aggregated fields, formulas, global fields) get no filter control. Links (edit, delete, ...), drop buttons, the "has new content" marker and the bulk operations checkboxes have nothing to filter and never get a filter, in both modes; they are not listed in the *Column filters* settings and are left out of the search.
 - Values are the raw database values (dates are shown formatted, markup is stripped from the labels). To show other labels (e.g. names for ids) implement `hook_datatables_filter_options_alter(&$options, $view, $field_id)`, where `$options` is an array `value => label`.
 - Fields with several values: if a Field API field is set to "Display all values in the same row" (as unordered list, ordered list or with a separator), the drop-down offers every single value as its own option, and choosing one shows all rows that contain this value. With server-side processing the values are read from the field table; without it the cell is split according to the field's list type or separator. Rows are never repeated when several values of a row match. A value that itself contains the separator string cannot be told apart in client-side mode; use a list type or another separator in that case.
 
@@ -91,11 +91,45 @@ The text box column filters accept an operator at the start of the input:
   columns the operators cannot be used on have no hint.
 * Works in client-side and server-side mode.
 
+### Search with server-side processing (AJAX)
+
+With server-side processing the search box and the text column filters are
+evaluated by the database. Columns that store a key or an id and show a label
+are searched by what the table shows, so the result is the same as without
+AJAX:
+
+* the content type (its name, not the machine name; unless the field is set to
+  show the machine name),
+* list fields (the labels of the allowed values),
+* yes/no fields such as *Content: Published* (the text the field is set up to show, e.g. "Published" / "Not published"; the drop-down filter of such a column lists these texts too),
+* taxonomy term and entity reference fields (the names / labels of the
+  referenced entities that the user may view; the first 200 matches are used).
+
+For other columns the stored value is searched, so a column whose text is made
+by rewriting the result, a formatter or a date format is searched by the
+stored value, not by the displayed text. Columns that cannot be searched in SQL
+(aggregated fields, formulas, global fields) are left out; the view settings
+list them under "Enable the search filter box".
+
+## Bulk operations
+
+A *Content: Bulk operations* field (checkbox in every row and a form to run an action on the selected rows) works in a DataTable, with and without server-side processing.
+
+- The column has no sorting, search or filter, it is never hidden by the responsive behaviour, and it is not part of exports or the *Columns* menu.
+- The checkbox in the header selects or clears the rows of the current page.
+- The selection is kept when the page changes (also when the rows of a page come from the server), and the action is applied to all selected rows, also those on other pages.
+- With server-side processing the form is not built with these rows. When it is submitted, the selected ids are checked against the view again (with its arguments, exposed filters and access checks), and ids that the view would not show are ignored.
+- *Select all items on all pages* is not offered in a DataTable, as it could not know the rows that the table filters leave.
+
 ## Sticky header
 
 The style option *Sticky table header* keeps the column titles and the filterrow at the top of the window while the page scrolls. It uses CSS(`position: sticky`) on the real header, not Backdrop's cloned header, andrespects the administration bar (elements with a `data-offset-top` attribute)and any `<header>` element of the theme that is fixed or sticky at the top ofthe window (its current height is followed while scrolling, so shrinkingheaders work). Other fixed bars, e.g. a `div`, can be named in the style option*Fixed elements above the sticky header* as a CSS selector.It is not active in the Views preview or together with a fixed table height(Scroller), where the header does not scroll away anyway. The theme must notset `overflow` on a parent element of the table, as that disables stickypositioning.
 
 The filter row is not part of exports (copy, CSV, Excel, PDF, print): only the column titles are exported as header.
+
+## Hide empty column
+
+The style option *Hide empty column* removes a column from a client-side table when all its cells are empty. With server-side processing the setting is not available (and ignored): which cells are empty depends on the page, but the columns of a DataTable are defined once.
 
 ## Responsive behaviour
 

@@ -263,6 +263,7 @@ function theme_datatable($variables) {
 function template_preprocess_datatables_view(&$vars) {
   // Run views table preprocess function to handle putting rows in columns,
   // classes, etc.
+  $vars['view']->style_plugin->keep_empty_columns();
   template_preprocess_views_view_table($vars);
 
   $view     = $vars['view'];
@@ -287,6 +288,7 @@ function template_preprocess_datatables_view(&$vars) {
   $column_filters = array();
   $column_kinds = array();
   $column_zones = array();
+  $bulk_columns = array();
   $column_split = array();
   $date_fields = array();
   $serverside = $is_serverside;
@@ -310,7 +312,8 @@ function template_preprocess_datatables_view(&$vars) {
 
     // Render the header labels.
     // TODO: what to do if field != column (field displayed with other column)?
-    if ($field == $column && empty($fields[$field]->options['exclude'])) {
+    // (A column that "Hide empty column" has removed has no header cell.)
+    if ($field == $column && empty($fields[$field]->options['exclude']) && isset($vars['header'][$field])) {
       // Overrides clicksort head defined in
       // template_preprocess_views_view_table().
       $vars['header'][$field] = check_plain(!empty($fields[$field]) ? $fields[$field]->label() : '');
@@ -353,6 +356,19 @@ function template_preprocess_datatables_view(&$vars) {
         }
         $column_options['orderable'] = TRUE;
       }
+      // Columns without data to search or filter (links, drop buttons, ...):
+      // the search leaves them out.
+      if (!datatables_field_filterable($fields[$field])) {
+        $column_options['searchable'] = FALSE;
+      }
+      // The checkboxes of "Bulk operations": no sorting, no search, always
+      // shown (Responsive does not hide them), not part of exports.
+      if ($fields[$field] instanceof views_handler_field_bulk_form) {
+        $column_options['orderable'] = FALSE;
+        $column_options['searchable'] = FALSE;
+        $column_options['className'] = trim((!empty($column_options['className']) ? $column_options['className'] . ' ' : '') . 'dt-bulk all');
+        $bulk_columns[$field] = TRUE;
+      }
       // Dates: the type "date" would make DataTables put the class
       // dt-type-date (right aligned) on the header, overriding the alignment
       // set in the style options. The column is declared as text instead and
@@ -365,6 +381,9 @@ function template_preprocess_datatables_view(&$vars) {
       // With server-side processing only columns that can be filtered in SQL
       // get a filter, otherwise it would silently do nothing.
       $filter_mode = isset($options['filters'][$field]) ? $options['filters'][$field] : 'none';
+      if (!datatables_field_filterable($fields[$field])) {
+        $filter_mode = 'none';
+      }
       if (in_array($filter_mode, array('text', 'select'))) {
         if (!$is_serverside || datatables_server_field_target($fields[$field])) {
           $column_filters[$field] = $filter_mode;
@@ -503,6 +522,7 @@ function template_preprocess_datatables_view(&$vars) {
     // How the text filter compares the values with an operator.
     'kinds' => $column_kinds,
     'zones' => $column_zones,
+    'bulk' => $bulk_columns,
     'timezone' => backdrop_get_user_timezone(),
     'cascade' => !empty($options['filter_options']['cascade']),
     // A table with a fixed height scrolls its body inside the page; its
@@ -767,7 +787,7 @@ function datatables_views_query_alter(&$view, &$query) {
   $pager->init($view, $view->display[$view->current_display], array('items_per_page' => 0, 'offset' => 0));
   if (_datatables_view_is_serverside($view)) {
     // Limit and offset are applied in datatables_views_post_build().
-    $pager->options['items_per_page'] = 1;
+    $pager->options['items_per_page'] = empty($view->datatables_bulk_check) ? 1 : 0;
   }
   else {
     // Client-side processing: request all records. The Views preview (shown
@@ -777,6 +797,14 @@ function datatables_views_query_alter(&$view, &$query) {
     $pager->options['items_per_page'] = $preview_limit;
   }
   $view->query->pager = $pager;
+
+  // The check of selected bulk operation ids (datatables_bulk_verify_ids()).
+  if (!empty($view->datatables_bulk_check)) {
+    $check = $view->datatables_bulk_check;
+    $alias = $query->ensure_table($check['table']);
+    $query->add_where(0, $alias . '.' . $check['field'], $check['ids'], 'IN');
+    return;
+  }
 
   // Searching or filtering a Field API column needs its table in the query.
   if (!empty($view->datatables_request) && _datatables_view_is_serverside($view)) {
@@ -802,7 +830,7 @@ function datatables_views_post_build(&$view) {
       isset($view->datatables_exclude) ? $view->datatables_exclude : NULL
     );
   }
-  elseif (empty($view->is_attachment) && empty($view->live_preview) && !empty($view->build_info['query']) && $view->build_info['query'] instanceof SelectQueryInterface) {
+  elseif (empty($view->datatables_bulk_check) && empty($view->is_attachment) && empty($view->live_preview) && !empty($view->build_info['query']) && $view->build_info['query'] instanceof SelectQueryInterface) {
     // Normal page request: the table is rendered empty, DataTables then asks
     // for the first page itself. No need to run a query for rows we discard.
     $view->build_info['query']->where('1 = 0');
@@ -1109,4 +1137,141 @@ function datatables_date_sort_key($handler, $result) {
 
 function _datatables_is_date_field($handler) {
   return $handler instanceof views_handler_field_date || $handler instanceof views_handler_field_datetime || datatables_date_column_info($handler);
+}
+
+
+/**
+ * Tells whether a column can have a filter (and is searched).
+ *
+ * Links, drop buttons, the "has new content" marker and the bulk operations
+ * checkboxes have nothing to search or filter. Not related to the type of
+ * processing; datatables_server_field_searchable() adds the SQL conditions.
+ */
+function datatables_field_filterable($handler) {
+  if ($handler instanceof views_handler_field_bulk_form || $handler instanceof views_handler_field_history_user_timestamp) {
+    return FALSE;
+  }
+  // The "link" handlers of all entities (edit link, delete link, drop button,
+  // contextual links, ...).
+  for ($class = get_class($handler); $class; $class = get_parent_class($class)) {
+    if (preg_match('/_links?(_|$)/', $class)) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Views forms of tables with server-side processing and bulk operations: the
+ * rows come from the server later, so the form cannot know them.
+ */
+function datatables_form_alter(&$form, &$form_state, $form_id) {
+  if (strpos($form_id, 'views_form_') !== 0 || empty($form_state['build_info']['args'][0]) || !is_object($form_state['build_info']['args'][0])) {
+    return;
+  }
+  $view = $form_state['build_info']['args'][0];
+  if (empty($view->field) || !datatables_view_has_bulk_form($view)) {
+    return;
+  }
+  // "Select all items on all pages" cannot know the rows left by the filters
+  // of the table.
+  unset($form['select_all_pages'], $form['select_all_pages_markup']);
+  array_unshift($form['#validate'], 'datatables_bulk_form_validate');
+}
+
+/**
+ * Tells whether a View is a DataTable with a bulk operations column.
+ */
+function datatables_view_has_bulk_form($view) {
+  if (empty($view->field) || empty($view->display_handler)) {
+    return FALSE;
+  }
+  $plugin = $view->display_handler->get_plugin('style');
+  if (!($plugin instanceof datatables_style_plugin)) {
+    return FALSE;
+  }
+  foreach ($view->field as $handler) {
+    if ($handler instanceof views_handler_field_bulk_form) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Validate handler of Views forms with bulk operations in a DataTable.
+ *
+ * The checkboxes of rows that were loaded later (server-side processing, or
+ * rows on other pages) are named after the id they select. They are not part
+ * of the form that was built with the page, so they are read from the input,
+ * and only ids that the View really shows are accepted.
+ */
+function datatables_bulk_form_validate($form, &$form_state) {
+  $view = $form_state['build_info']['args'][0];
+  foreach ($view->field as $id => $handler) {
+    if (!($handler instanceof views_handler_field_bulk_form)) {
+      continue;
+    }
+    $input = isset($form_state['input'][$id]) && is_array($form_state['input'][$id]) ? $form_state['input'][$id] : array();
+    $ids = array();
+    foreach ($input as $key => $value) {
+      if (is_scalar($value) && (string) $value !== '' && (string) $value !== '0' && (string) $key === (string) $value) {
+        $ids[(string) $value] = (string) $value;
+      }
+    }
+    if (count($ids) > 5000) {
+      form_set_error($id, t('Too many items are selected (at most 5000).'));
+      continue;
+    }
+    if ($ids) {
+      $ids = datatables_bulk_verify_ids($view, $handler, $ids);
+    }
+    // Rows that were selected by the form itself (the first page, or
+    // client-side tables) are already in the values.
+    $values = isset($form_state['values'][$id]) && is_array($form_state['values'][$id]) ? array_filter($form_state['values'][$id]) : array();
+    $form_state['values'][$id] = $values + $ids;
+  }
+}
+
+/**
+ * Keeps the ids that the View shows to the current user.
+ *
+ * The View is run again, with the same arguments and exposed input, but
+ * restricted to the selected ids, so nothing can be selected that the View
+ * would not list (access, filters).
+ *
+ * @return array
+ *   The ids that are allowed, keyed by themselves.
+ */
+function datatables_bulk_verify_ids($view, $handler, array $ids) {
+  $check = views_get_view($view->name);
+  if (!$check) {
+    return array();
+  }
+  $check->set_display($view->current_display);
+  $check->set_arguments($view->args);
+  $check->set_exposed_input($view->get_exposed_input());
+  $check->set_items_per_page(0);
+  $check->datatables_bulk_check = array(
+    'table' => $handler->table,
+    'field' => $handler->real_field,
+    'ids' => array_values($ids),
+  );
+  $check->build();
+  if (!empty($check->build_info['fail'])) {
+    return array();
+  }
+  $check->execute();
+  $alias = isset($check->field[$handler->options['id']]->field_alias) ? $check->field[$handler->options['id']]->field_alias : NULL;
+  $allowed = array();
+  if ($alias) {
+    foreach ($check->result as $row) {
+      if (isset($row->{$alias}) && isset($ids[(string) $row->{$alias}])) {
+        $allowed[(string) $row->{$alias}] = (string) $row->{$alias};
+      }
+    }
+  }
+  return $allowed;
 }

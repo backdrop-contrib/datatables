@@ -72,6 +72,17 @@ class datatables_style_plugin extends views_plugin_style_table {
       return;
     }
 
+    // "Hide empty column" cannot work with server-side processing, see
+    // keep_empty_columns().
+    if ($this->is_serverside() && !empty($form['info'])) {
+      foreach (element_children($form['info']) as $field) {
+        if (isset($form['info'][$field]['empty_column'])) {
+          $form['info'][$field]['empty_column']['#disabled'] = TRUE;
+          $form['info'][$field]['empty_column']['#attributes']['title'] = t('Not available with server-side processing (AJAX).');
+        }
+      }
+    }
+
     // The sticky header is done by this module (CSS), not by Backdrop's
     // tableheader.js.
     $form['sticky']['#title'] = t('Sticky table header');
@@ -107,6 +118,21 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#default_value' => !empty($this->options['elements']['search_box']),
       '#description' => 'The search filter box allows users to dynamically filter the results in the table.  Disabling this option hides the search filter box; the column filters keep working.',
     );
+    if ($this->is_serverside()) {
+      // With server-side processing the search runs in SQL.
+      module_load_include('inc', 'datatables', 'datatables.server');
+      $skipped = array();
+      $labels = $this->display->handler->get_field_labels();
+      foreach ($this->display->handler->get_handlers('field') as $field_id => $handler) {
+        if (datatables_field_filterable($handler) && !datatables_server_field_searchable($handler) && empty($handler->options['exclude'])) {
+          $skipped[] = check_plain(isset($labels[$field_id]) ? $labels[$field_id] : $field_id);
+        }
+      }
+      $form['elements']['search_box']['#description'] .= ' ' . t('With server-side processing (AJAX) the search is done by the database. For content types, list fields, taxonomy terms and entity references it looks at the labels that the table shows.');
+      if ($skipped) {
+        $form['elements']['search_box']['#description'] .= ' ' . t('These columns cannot be searched by the database (aggregated fields, formulas, global fields) and are left out of the search and the column filters: @columns.', array('@columns' => implode(', ', $skipped)));
+      }
+    }
     $form['elements']['table_info'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable the table information display.'),
@@ -272,7 +298,20 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#collapsed' => TRUE,
       '#description' => t('Adds a filter below the header of a column. A <em>drop-down</em> lists the distinct values of the column; with server-side processing (AJAX) they are read from the database, limited to the rows that are left by the other filters of the table (like Views Selective Filters). With server-side processing, columns that cannot be filtered in SQL (aggregated fields, formulas, global fields) get no filter.'),
     );
+    $field_handlers = $this->display->handler->get_handlers('field');
+    $serverside = $this->is_serverside();
+    if ($serverside) {
+      module_load_include('inc', 'datatables', 'datatables.server');
+    }
     foreach ($columns as $column_name => $column_label) {
+      // Links, drop buttons, bulk operations and (with server-side
+      // processing) columns that the database cannot search have no filter.
+      if (isset($field_handlers[$column_name])) {
+        $handler = $field_handlers[$column_name];
+        if (!datatables_field_filterable($handler) || ($serverside && !datatables_server_field_searchable($handler))) {
+          continue;
+        }
+      }
       $form['filters'][$column_name] = array(
         '#type' => 'select',
         '#title' => check_plain($column_label),
@@ -313,6 +352,21 @@ class datatables_style_plugin extends views_plugin_style_table {
    * DataTables (not the Views pager) must do the paging. The Views live
    * preview has no AJAX settings, so it always works client-side.
    */
+  /**
+   * Switches off "Hide empty column" for server-side processing.
+   *
+   * Which columns are empty depends on the rows of a page, but the columns of
+   * a DataTable are defined once, so with server-side processing a column
+   * would be missing in the data of some pages.
+   */
+  function keep_empty_columns() {
+    if ($this->is_serverside() && !empty($this->options['info'])) {
+      foreach ($this->options['info'] as $field => $info) {
+        $this->options['info'][$field]['empty_column'] = FALSE;
+      }
+    }
+  }
+
   function is_serverside() {
     if (!empty($this->view->live_preview)) {
       return FALSE;
@@ -439,6 +493,8 @@ class datatables_style_plugin extends views_plugin_style_table {
     module_load_include('inc', 'datatables', 'datatables.server');
     $request = $this->view->datatables_request;
 
+    $this->keep_empty_columns();
+
     // Use the same code as the table template, so fields that share a column
     // are combined and classes/excluded fields are handled identically.
     $vars = array(
@@ -449,11 +505,28 @@ class datatables_style_plugin extends views_plugin_style_table {
     );
     template_preprocess_views_view_table($vars);
 
+    // Bulk operations: the checkboxes of the rows (see below).
+    $bulk = array();
+    foreach ($this->view->field as $field_id => $handler) {
+      if ($handler instanceof views_handler_field_bulk_form) {
+        $bulk[$field_id] = $handler;
+      }
+    }
+
     $data = array();
     foreach ($vars['rows'] as $i => $row) {
       $item = array();
       foreach ($row as $column => $html) {
         $item[$column] = (string) $html;
+      }
+      foreach ($bulk as $field_id => $handler) {
+        if (isset($item[$field_id]) && isset($this->view->result[$i]->{$handler->field_alias})) {
+          // The Views form only knows the rows that it was built with. These
+          // checkboxes are named after the id they select, and the form
+          // checks the ids when it is submitted (datatables_bulk_form_validate()).
+          $value = check_plain((string) $this->view->result[$i]->{$handler->field_alias});
+          $item[$field_id] = '<input type="checkbox" class="form-checkbox" name="' . check_plain($field_id) . '[' . $value . ']" value="' . $value . '" aria-label="' . check_plain(t('Update this item')) . '" />';
+        }
       }
       if (!empty($vars['row_classes'][$i]) && is_array($vars['row_classes'][$i])) {
         $item['DT_RowClass'] = implode(' ', $vars['row_classes'][$i]);

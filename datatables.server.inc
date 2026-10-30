@@ -173,6 +173,28 @@ function datatables_server_field_target($handler) {
 }
 
 /**
+ * Tells whether a field can be searched and filtered in SQL.
+ *
+ * Like datatables_server_field_target(), but can be used before the query has
+ * been built (the settings form), when the handlers have no table alias yet.
+ */
+function datatables_server_field_searchable($handler) {
+  if (!($handler instanceof views_handler_field)) {
+    return FALSE;
+  }
+  if (!empty($handler->options['group_type']) && $handler->options['group_type'] != 'group') {
+    return FALSE;
+  }
+  if ($handler->table == 'views') {
+    return FALSE;
+  }
+  if ($handler instanceof views_handler_field_field) {
+    return !empty($handler->definition['field_name']);
+  }
+  return !empty($handler->real_field) && preg_match('/^[A-Za-z0-9_]+$/', $handler->real_field);
+}
+
+/**
  * Returns "table_alias.column" for a field handler that can be searched and
  * filtered in SQL, or NULL.
  */
@@ -462,12 +484,12 @@ function datatables_server_apply_request($view, array $request, $role = 'main', 
       continue;
     }
     if ($col['searchable']) {
-      $global[] = $sql;
+      $global[] = array($sql, $view->field[$id]);
     }
     // Column filters come from the style options, never from the request.
     $mode = isset($filters[$id]) ? $filters[$id] : 'none';
     if ($col['search'] !== '' && in_array($mode, array('text', 'select')) && $id !== $exclude) {
-      $column_conditions[] = array($sql, $col['search'], $mode, datatables_column_kind($view->field[$id]), datatables_date_column_info($view->field[$id]));
+      $column_conditions[] = array($sql, $col['search'], $mode, datatables_column_kind($view->field[$id]), datatables_date_column_info($view->field[$id]), $view->field[$id]);
     }
   }
   $tokens = ($request['search'] === '') ? array() : preg_split('/\s+/', $request['search']);
@@ -477,8 +499,8 @@ function datatables_server_apply_request($view, array $request, $role = 'main', 
     if ($role != 'count' && $global) {
       foreach ($tokens as $token) {
         $or = db_or();
-        foreach ($global as $sql) {
-          $or->condition($sql, '%' . db_like($token) . '%', 'LIKE');
+        foreach ($global as $column) {
+          $or->condition(datatables_server_contains_condition($column[1], $column[0], $token));
         }
         $query->condition($or);
       }
@@ -503,7 +525,7 @@ function datatables_server_apply_request($view, array $request, $role = 'main', 
           }
         }
         elseif (!$parsed) {
-          $query->condition($c[0], '%' . db_like($c[1]) . '%', 'LIKE');
+          $query->condition(datatables_server_contains_condition($c[5], $c[0], $c[1]));
         }
       }
     }
@@ -605,6 +627,24 @@ function datatables_server_total_count($view, array $request) {
  */
 function datatables_server_value_labels($handler, array $values) {
   $labels = array();
+  if ($handler instanceof views_handler_field_node_type) {
+    // The content type column shows the name, unless it is set to show the
+    // machine name.
+    if (empty($handler->options['machine_name'])) {
+      foreach ($values as $value) {
+        $labels[$value] = (string) t(node_type_get_name($value));
+      }
+    }
+    return $labels;
+  }
+  if ($handler instanceof views_handler_field_boolean) {
+    // "Published" / "Not published", "Yes" / "No", ...: as the field is set
+    // up to show the values.
+    foreach ($values as $value) {
+      $labels[$value] = datatables_server_boolean_label($handler, $value);
+    }
+    return $labels;
+  }
   if (!($handler instanceof views_handler_field_field) || empty($handler->definition['field_name']) || !$values) {
     return $labels;
   }
@@ -637,6 +677,141 @@ function datatables_server_value_labels($handler, array $values) {
     }
   }
   return $labels;
+}
+
+/**
+ * The text that a boolean field shows for a stored value.
+ */
+function datatables_server_boolean_label($handler, $value) {
+  $row = new stdClass();
+  $row->{$handler->field_alias} = $value;
+  $label = trim(preg_replace('/\s+/', ' ', decode_entities(strip_tags((string) $handler->render($row)))));
+  return ($label === '') ? (string) $value : $label;
+}
+
+/**
+ * Finds the stored values of a column whose label contains a text.
+ *
+ * Some columns store a key or an id and show a label: the content type, list
+ * fields, taxonomy terms and entity references. The table shows (and the
+ * search in the browser looks at) the label, so the search in SQL has to look
+ * for the stored values that have this label.
+ *
+ * @param object $handler
+ *   The field handler.
+ * @param string $term
+ *   The text to find in the label (case insensitive).
+ *
+ * @return array|null
+ *   The stored values (can be empty: nothing has such a label), or NULL if the
+ *   column shows what is stored and can be searched directly.
+ */
+function datatables_server_label_values($handler, $term) {
+  static $cache = array();
+  $key = get_class($handler) . ':' . $handler->table . ':' . $handler->field . ':' . (isset($handler->options['id']) ? $handler->options['id'] : '') . ':' . backdrop_strtolower($term);
+  if (!array_key_exists($key, $cache)) {
+    $cache[$key] = _datatables_server_label_values($handler, $term);
+  }
+  return $cache[$key];
+}
+
+function _datatables_server_label_values($handler, $term) {
+  $needle = backdrop_strtolower($term);
+  $matches = function ($label) use ($needle) {
+    $plain = trim(preg_replace('/\s+/', ' ', decode_entities(strip_tags((string) $label))));
+    return strpos(backdrop_strtolower($plain), $needle) !== FALSE;
+  };
+
+  if ($handler instanceof views_handler_field_node_type) {
+    if (!empty($handler->options['machine_name'])) {
+      return NULL;
+    }
+    $found = array();
+    foreach (node_type_get_names() as $type => $name) {
+      if ($matches(t($name))) {
+        $found[] = $type;
+      }
+    }
+    return $found;
+  }
+
+  if ($handler instanceof views_handler_field_boolean) {
+    $found = array();
+    foreach (array(0, 1) as $value) {
+      if ($matches(datatables_server_boolean_label($handler, $value))) {
+        $found[] = (string) $value;
+      }
+    }
+    return $found;
+  }
+
+  if (!($handler instanceof views_handler_field_field) || empty($handler->definition['field_name'])) {
+    return NULL;
+  }
+  $field = field_info_field($handler->definition['field_name']);
+  if (!$field) {
+    return NULL;
+  }
+
+  if (in_array($field['type'], array('list_text', 'list_integer', 'list_float', 'list_boolean')) && function_exists('list_allowed_values')) {
+    $found = array();
+    foreach (list_allowed_values($field) as $value => $label) {
+      if (is_scalar($label) && $matches($label)) {
+        $found[] = (string) $value;
+      }
+    }
+    return $found;
+  }
+
+  if (in_array($field['type'], array('entityreference', 'taxonomy_term_reference'))) {
+    $entity_type = ($field['type'] == 'entityreference') ? (isset($field['settings']['target_type']) ? $field['settings']['target_type'] : NULL) : 'taxonomy_term';
+    $info = $entity_type ? entity_get_info($entity_type) : NULL;
+    if (!$info || empty($info['base table']) || empty($info['entity keys']['id']) || empty($info['entity keys']['label'])) {
+      return NULL;
+    }
+    $query = db_select($info['base table'], 'e');
+    $query->addField('e', $info['entity keys']['id'], 'id');
+    $query->condition('e.' . $info['entity keys']['label'], '%' . db_like($term) . '%', 'LIKE');
+    $query->range(0, 200);
+    try {
+      $ids = $query->execute()->fetchCol();
+    }
+    catch (Exception $e) {
+      watchdog_exception('datatables', $e);
+      return NULL;
+    }
+    // Only what the user may see: the same check as for the labels shown.
+    $found = array();
+    foreach ($ids ? entity_load_multiple($entity_type, $ids) : array() as $id => $entity) {
+      if (entity_access('view', $entity_type, $entity)) {
+        $found[] = (string) $id;
+      }
+    }
+    return $found;
+  }
+  return NULL;
+}
+
+/**
+ * The condition "the column contains a text", as the table shows it.
+ *
+ * @return object
+ *   A condition object.
+ */
+function datatables_server_contains_condition($handler, $sql, $term) {
+  $values = datatables_server_label_values($handler, $term);
+  $condition = db_and();
+  if ($values === NULL) {
+    $condition->condition($sql, '%' . db_like($term) . '%', 'LIKE');
+  }
+  elseif ($values) {
+    $condition->condition($sql, $values, 'IN');
+  }
+  else {
+    // No label contains the text.
+    $condition->where('1 = 0');
+  }
+  return $condition;
 }
 
 /**

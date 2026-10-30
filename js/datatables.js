@@ -997,7 +997,7 @@
         .attr('aria-label', Backdrop.t('Filter'))
         .on('click', function (e) { e.stopPropagation(); })
         .on('change', function () {
-          search(column, $(this).val(), 'select', id);
+          search(column, $(this).val() || '', 'select', id);
         });
       $cell.empty().append($select);
       controls[id] = {type: 'select', column: column, $cell: $cell, $control: $select};
@@ -1146,6 +1146,117 @@
     };
   }
 
+  /**
+   * Keeps the bulk operations checkboxes out of exports and the column list.
+   */
+  function excludeBulkColumns(buttons) {
+    return $.map(buttons, function (button) {
+      if (typeof button === 'string') {
+        button = {extend: button};
+      }
+      if (!button || typeof button !== 'object') {
+        return [button];
+      }
+      if ($.isArray(button.buttons)) {
+        button.buttons = excludeBulkColumns(button.buttons);
+      }
+      if ($.inArray(button.extend, ['copy', 'copyHtml5', 'csv', 'csvHtml5', 'excel', 'excelHtml5', 'pdf', 'pdfHtml5', 'print']) !== -1) {
+        button.exportOptions = $.extend({columns: ':visible:not(.dt-bulk)'}, button.exportOptions);
+      }
+      else if (button.extend === 'colvis' && button.columns === undefined) {
+        button.columns = ':not(.dt-bulk)';
+      }
+      return [button];
+    });
+  }
+
+  /**
+   * Bulk operations: the checkboxes of the "Bulk operations" field.
+   *
+   * The checkboxes are form elements of the View's form, but a DataTable shows
+   * only a part of its rows in the page. This keeps the selection when the
+   * page changes, adds the checkbox in the header that selects the rows of the
+   * page, and makes the form send the selected rows that are not in the page.
+   */
+  function attachBulk(table, $table) {
+    var selected = {};
+
+    function boxes() {
+      return $(table.table().body()).find('input[type=checkbox]');
+    }
+
+    function syncHeader() {
+      var all = boxes();
+      var checked = all.filter(':checked').length;
+      $(table.table().container()).find('input.dt-bulk-all').prop({
+        checked: all.length > 0 && checked === all.length,
+        indeterminate: checked > 0 && checked < all.length
+      });
+    }
+
+    // The header checkbox. The bulk columns have the class dt-bulk.
+    $(table.table().header()).find('tr:not(.datatables-filters) th.dt-bulk').each(function () {
+      var $th = $(this);
+      if ($th.find('input.dt-bulk-all').length) {
+        return;
+      }
+      $('<input type="checkbox" class="form-checkbox dt-bulk-all">')
+        .attr('aria-label', Backdrop.t('Select all rows on this page'))
+        .on('click', function (e) { e.stopPropagation(); })
+        .on('change', function () {
+          var on = this.checked;
+          boxes().each(function () {
+            this.checked = on;
+            if (on) {
+              selected[this.name] = this.value;
+            }
+            else {
+              delete selected[this.name];
+            }
+          });
+          syncHeader();
+        })
+        .appendTo($th);
+    });
+
+    // A change of one checkbox (the rows are replaced by every draw, so the
+    // listener is on the table).
+    $table.on('change', 'tbody input[type=checkbox]', function () {
+      if (this.checked) {
+        selected[this.name] = this.value;
+      }
+      else {
+        delete selected[this.name];
+      }
+      syncHeader();
+    });
+
+    // Rows that come back with a draw show what was selected before.
+    table.on('draw', function () {
+      boxes().each(function () {
+        if (selected.hasOwnProperty(this.name)) {
+          this.checked = true;
+        }
+      });
+      syncHeader();
+    });
+
+    // Rows that are not in the page are not part of the form: send them.
+    $table.closest('form').on('submit.datatablesBulk', function () {
+      var $form = $(this);
+      $form.find('input.dt-bulk-hidden').remove();
+      var present = {};
+      boxes().each(function () {
+        present[this.name] = true;
+      });
+      $.each(selected, function (name, value) {
+        if (!present[name]) {
+          $('<input type="hidden" class="dt-bulk-hidden">').attr({name: name, value: value}).appendTo($form);
+        }
+      });
+    });
+  }
+
   Backdrop.behaviors.datatables = {
     attach: function (context, settings) {
       $.each(settings.datatables, function (selector) {
@@ -1170,6 +1281,9 @@
 
           if (cfg && !$.isEmptyObject(cfg.filters) && $.isArray(options.buttons)) {
             options.buttons = exportTitleRowOnly(options.buttons);
+          }
+          if (cfg && !$.isEmptyObject(cfg.bulk) && $.isArray(options.buttons)) {
+            options.buttons = excludeBulkColumns(options.buttons);
           }
 
           var state = {selects: [], optionsLoaded: false, setOptions: null, exporting: false};
@@ -1219,6 +1333,9 @@
 
           if (cfg && !$.isEmptyObject(cfg.filters)) {
             attachFilters(table, $table, cfg, state);
+          }
+          if (cfg && !$.isEmptyObject(cfg.bulk)) {
+            attachBulk(table, $table);
           }
           if (cfg && cfg.hideSearch) {
             $(table.table().container()).find('.dt-search').hide();
