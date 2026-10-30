@@ -312,6 +312,73 @@
   }
 
   /**
+   * Lets the browser size the columns when DataTables' widths do not fit.
+   *
+   * DataTables measures the content of the columns, writes fixed widths to
+   * the <col> elements and distributes the remaining width proportionally. A
+   * browser table never shrinks a column below such a width, so when the
+   * measurement is too small for content that cannot wrap (an element with
+   * "white-space: nowrap") the content sticks out of its cell or the table
+   * gets wider than its container, while the other columns keep their wide
+   * shares. When this happens, the widths are removed and the browser's own
+   * automatic table layout (which honors the content of every column) is
+   * used. The check runs after every sizing and draw of the table.
+   */
+  function nativeColumnWidths(table) {
+    var $table = $(table.table().node());
+    var pending = false;
+
+    function overflows() {
+      var container = $table.parent()[0];
+      if (!container) {
+        return false;
+      }
+      if ($table[0].offsetWidth > container.clientWidth + 1) {
+        return true;
+      }
+      var found = false;
+      $table.children('tbody').children('tr').each(function () {
+        $(this).children('td').each(function () {
+          if (this.offsetWidth > 0 && this.scrollWidth > this.clientWidth + 1) {
+            found = true;
+            return false;
+          }
+        });
+        return !found;
+      });
+      return found;
+    }
+
+    function check() {
+      pending = false;
+      if (overflows()) {
+        $table.children('colgroup').children('col').css('width', 'auto');
+        $table.css('width', '100%');
+      }
+    }
+
+    // DataTables writes the widths at the end of a draw and when it has
+    // finished initializing, so look a moment later.
+    function schedule() {
+      if (!pending) {
+        pending = true;
+        window.setTimeout(function () {
+          window.requestAnimationFrame(check);
+        }, 50);
+      }
+    }
+
+    table.on('init draw column-sizing responsive-resize', schedule);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(schedule);
+    }
+    // Images (e.g. file icons) change the width of the content when they have
+    // loaded; load events do not bubble, so listen while they travel down.
+    $table[0].addEventListener('load', schedule, true);
+    schedule();
+  }
+
+  /**
    * Makes a Scroller table use the height of the window down to its bottom.
    *
    * CSS alone cannot know how much room the elements above and below the
@@ -446,6 +513,11 @@
         params.columns.push(ids[this.index()]);
       }
       var value = this.search();
+      var typed = $(table.table().node()).data('datatablesFilterValues');
+      if (typed && ids[this.index()] && typed.hasOwnProperty(ids[this.index()])) {
+        // A filter with an operator: the column search itself is empty.
+        value = typed[ids[this.index()]];
+      }
       if (value && ids[this.index()]) {
         params.filters[ids[this.index()]] = value;
       }
@@ -658,6 +730,195 @@
   }
 
   /**
+   * Operators in the text filter of a column.
+   *
+   * The text of the filter can start with an operator (> >= < <= = != !) or be
+   * a range ("a - b" with spaces around the dash, or "a..b"). Dates can be
+   * given as 2025, 2025-03, 2025-03-14, 2025-03-14 12:30[:00], 14.3.2025 or
+   * 3.2025 and stand for the whole year, month, day, ...; the comparison
+   * uses the time zone of the site user. With server-side processing the
+   * server does this (datatables.server.inc); these functions are for
+   * client-side processing.
+   */
+  function parseOperator(text) {
+    text = $.trim(text);
+    var m = text.match(/^(>=|<=|<>|!=|>|<|=|!)\s*([\s\S]*)$/);
+    if (m) {
+      var value = $.trim(m[2]);
+      return {op: m[1] === '<>' ? '!=' : m[1], a: value === '' ? null : value, b: null};
+    }
+    m = text.match(/^([\s\S]+?)(?:\s+-\s+|\.\.)([\s\S]+)$/);
+    if (m) {
+      return {op: 'between', a: $.trim(m[1]), b: $.trim(m[2])};
+    }
+    return null;
+  }
+
+  function zoneOffset(timestamp, timeZone) {
+    var parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric'
+    }).formatToParts(new Date(timestamp));
+    var v = {};
+    $.each(parts, function (i, part) {
+      v[part.type] = parseInt(part.value, 10);
+    });
+    return Date.UTC(v.year, v.month - 1, v.day, v.hour % 24, v.minute, v.second) - timestamp;
+  }
+
+  /**
+   * Seconds since 1970 of a wall clock time in a time zone.
+   */
+  function zonedSeconds(wall, timeZone) {
+    var guess = Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate(), wall.getUTCHours(), wall.getUTCMinutes(), wall.getUTCSeconds());
+    var offset = zoneOffset(guess, timeZone);
+    var result = guess - offset;
+    var again = zoneOffset(result, timeZone);
+    if (again !== offset) {
+      result = guess - again;
+    }
+    return Math.floor(result / 1000);
+  }
+
+  /**
+   * The period (first second, first second after it) a typed date stands for.
+   */
+  function parseDate(text, timeZone) {
+    var m = $.trim(text).match(/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2})(?:[ T](\d{1,2})(?::(\d{2})(?::(\d{2}))?)?)?)?)?$/);
+    var y, mo, d, h, mi, s;
+    if (m) {
+      y = +m[1]; mo = m[2]; d = m[3]; h = m[4]; mi = m[5]; s = m[6];
+    }
+    else if ((m = $.trim(text).match(/^(?:(\d{1,2})\.)?(\d{1,2})\.(\d{4})$/))) {
+      y = +m[3]; mo = m[2]; d = m[1]; h = mi = s = undefined;
+    }
+    else {
+      return null;
+    }
+    var month = mo ? +mo : 1;
+    var day = d ? +d : 1;
+    var check = new Date(Date.UTC(y, month - 1, day));
+    if (y < 1000 || month < 1 || month > 12 || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day ||
+      (h && +h > 23) || (mi && +mi > 59) || (s && +s > 59)) {
+      return null;
+    }
+    var parts = [y, month - 1, day, h ? +h : 0, mi ? +mi : 0, s ? +s : 0];
+    var step = [1, 0, 0, 0, 0, 0];
+    $.each([[s, 5], [mi, 4], [h, 3], [d, 2], [mo, 1]], function (i, item) {
+      if (item[0] !== undefined && item[0] !== '') {
+        step = [0, 0, 0, 0, 0, 0];
+        step[item[1]] = 1;
+        return false;
+      }
+    });
+    var start = new Date(Date.UTC(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]));
+    var next = new Date(Date.UTC(parts[0] + step[0], parts[1] + step[1], parts[2] + step[2], parts[3] + step[3], parts[4] + step[4], parts[5] + step[5]));
+    return [zonedSeconds(start, timeZone), zonedSeconds(next, timeZone)];
+  }
+
+  function parseNumber(text) {
+    text = String(text).replace(/[\s\u00a0]/g, '');
+    if (text.indexOf('.') !== -1) {
+      text = text.replace(/,/g, '');
+    }
+    else {
+      text = text.replace(',', '.');
+    }
+    return /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(text) ? parseFloat(text) : NaN;
+  }
+
+  /**
+   * Tests a cell against an operator expression.
+   *
+   * @param {Object} filter
+   *   {parsed: parseOperator() result, kind: 'date'|'number'|'text'|'none'}.
+   * @param {string} cell
+   *   The cell content (for dates the sort key, a timestamp).
+   * @return {boolean|null}
+   *   null when the filter cannot be applied (yet).
+   */
+  function startsWith(text, prefix) {
+    return text.toLowerCase().indexOf(prefix.toLowerCase()) === 0;
+  }
+
+  function operatorMatches(filter, cell, timeZone) {
+    var parsed = filter.parsed;
+    var op = parsed.op;
+    var a, b, v;
+    if (op === '!' && filter.kind !== 'text') {
+      // "Does not contain" means "not equal" for dates and numbers.
+      op = '!=';
+    }
+    if (parsed.a === null || (op === 'between' && parsed.b === null)) {
+      return null;
+    }
+    if (filter.kind === 'date') {
+      a = parseDate(parsed.a, timeZone);
+      b = op === 'between' ? parseDate(parsed.b, timeZone) : null;
+      if (!a || (op === 'between' && !b)) {
+        return null;
+      }
+      v = parseInt(cell, 10);
+      if (isNaN(v)) {
+        return false;
+      }
+      switch (op) {
+        case '=': return v >= a[0] && v < a[1];
+        case '!=': return v < a[0] || v >= a[1];
+        case '>': return v >= a[1];
+        case '>=': return v >= a[0];
+        case '<': return v < a[0];
+        case '<=': return v < a[1];
+        default: return v >= a[0] && v < b[1];
+      }
+    }
+    var compare;
+    if (filter.kind === 'number') {
+      a = parseNumber(parsed.a);
+      b = op === 'between' ? parseNumber(parsed.b) : 0;
+      if (isNaN(a) || isNaN(b)) {
+        return null;
+      }
+      v = parseNumber(plainText(cell));
+      if (isNaN(v)) {
+        return false;
+      }
+      compare = function (x, y) { return x < y ? -1 : (x > y ? 1 : 0); };
+    }
+    else {
+      a = parsed.a;
+      b = parsed.b;
+      v = plainText(cell);
+      compare = function (x, y) { return x.localeCompare(y, undefined, {sensitivity: 'base'}); };
+    }
+    switch (op) {
+      case '=': return compare(v, a) === 0;
+      case '!=': return compare(v, a) !== 0;
+      case '!': return v.toLowerCase().indexOf(a.toLowerCase()) < 0;
+      case '>': return compare(v, a) > 0 && !(filter.kind === 'text' && startsWith(v, a));
+      case '>=': return compare(v, a) >= 0;
+      case '<': return compare(v, a) < 0;
+      case '<=': return compare(v, a) <= 0 || (filter.kind === 'text' && startsWith(v, a));
+      default: return compare(v, a) >= 0 && compare(v, b) <= 0;
+    }
+  }
+
+  /**
+   * The tooltip of a text filter: the operators that work for the column.
+   */
+  function operatorHint(kind) {
+    switch (kind) {
+      case 'date':
+        return Backdrop.t('Operators: > >= < <= = != and ranges like 2020 - 2023. Dates: 2025, 2025-03, 2025-03-14.');
+      case 'number':
+        return Backdrop.t('Operators: > >= < <= = != and ranges like 10 - 20.');
+      case 'text':
+        return Backdrop.t('Operators: = (exact), != (not equal), ! (does not contain), > >= < <= (alphabetical; <=B includes everything starting with B).');
+    }
+    return '';
+  }
+
+  /**
    * Builds the column filter controls in the second header row.
    */
   function attachFilters(table, $table, cfg, state) {
@@ -667,8 +928,28 @@
     // looks at the single values of a cell instead of the whole cell text.
     var multi = {};
 
+    // Text filters with an operator (client-side processing): id => {column,
+    // parsed, kind}.
+    var operators = {};
+
     function search(column, value, type, id) {
-      if (multi[id]) {
+      if (type === 'text' && !cfg.serverSide && cfg.kinds && cfg.kinds[id] && cfg.kinds[id] !== 'none') {
+        var parsed = parseOperator(value);
+        // Ranges are for dates and numbers, text with a dash is searched.
+        var values = $table.data('datatablesFilterValues') || {};
+        $table.data('datatablesFilterValues', values);
+        if (parsed && !(parsed.op === 'between' && cfg.kinds[id] === 'text')) {
+          operators[id] = {column: column, parsed: parsed, kind: cfg.kinds[id]};
+          // The column search stays empty; the text is kept for the URL.
+          values[id] = value;
+          column.search('').draw();
+          return;
+        }
+        delete operators[id];
+        delete values[id];
+        column.search(value).draw();
+      }
+      else if (multi[id]) {
         multi[id].value = value;
         table.draw();
       }
@@ -683,22 +964,32 @@
 
     function makeText(id, column, $cell) {
       var timer;
+      // The text that is in effect (a filter restored from the URL, ...).
+      var initial = column.search();
+      var applied = initial;
       var $input = $('<input type="text" class="form-text form-control datatables-filter datatables-filter-text">')
         .attr('placeholder', Backdrop.t('Filter'))
         .attr('aria-label', Backdrop.t('Filter'))
-        .val(column.search())
+        .attr('title', operatorHint(cfg.kinds && cfg.kinds[id]))
+        .val(initial)
         .on('click', function (e) { e.stopPropagation(); })
         .on('keyup input', function () {
           var value = this.value;
           clearTimeout(timer);
           timer = setTimeout(function () {
-            if (column.search() !== value) {
-              search(column, value, 'text');
+            if (applied !== value) {
+              applied = value;
+              search(column, value, 'text', id);
             }
           }, 300);
         });
       $cell.empty().append($input);
       controls[id] = {type: 'text', column: column, $cell: $cell, $control: $input};
+      // A filter with an operator that comes from the URL: the column search
+      // would look for the literal text, so it is turned into an operator.
+      if (initial !== '' && !cfg.serverSide && cfg.kinds && cfg.kinds[id] && cfg.kinds[id] !== 'none' && parseOperator(initial)) {
+        search(column, initial, 'text', id);
+      }
     }
 
     function makeSelect(id, column, $cell) {
@@ -746,6 +1037,11 @@
       // With a scrolling body DataTables keeps a hidden clone of the header
       // for sizing; only the real header row (table.table().header()) is used.
       var $cell = $(table.table().header()).find('tr.datatables-filters th[data-field="' + id + '"]');
+      if (!$cell.length && state.filterCells && state.filterCells[id]) {
+        // A hidden column: DataTables has taken its header cells out of the
+        // table. They are put back when the column is shown.
+        $cell = state.filterCells[id];
+      }
       if (!$cell.length) {
         return;
       }
@@ -794,6 +1090,35 @@
             items = info.cache[dataIndex] = splitItems(table.cell(dataIndex, info.column.index()).data(), info.split);
           }
           if ($.inArray(info.value, items) < 0) {
+            ok = false;
+            return false;
+          }
+        });
+        return ok;
+      });
+    }
+
+    if (!cfg.serverSide && cfg.kinds && !$.isEmptyObject(cfg.kinds)) {
+      $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        if (settings.nTable !== table.table().node()) {
+          return true;
+        }
+        var ok = true;
+        $.each(operators, function (id, filter) {
+          var dtCell = table.cell(dataIndex, filter.column.index());
+          var cell;
+          if (filter.kind === 'date') {
+            // The raw timestamp is in the data-order attribute of the cell.
+            var node = dtCell.node();
+            cell = node && node.getAttribute('data-order');
+            if (cell === null || cell === undefined) {
+              cell = dtCell.render('sort');
+            }
+          }
+          else {
+            cell = dtCell.data();
+          }
+          if (operatorMatches(filter, cell, (cfg.zones && cfg.zones[id]) || cfg.timezone || 'UTC') === false) {
             ok = false;
             return false;
           }
@@ -877,6 +1202,13 @@
             historyRestored[historyKey] = true;
           }
 
+          // The filter cells of all columns, also the hidden ones (see
+          // attachFilters()).
+          state.filterCells = {};
+          $table.find('thead tr.datatables-filters th[data-field]').each(function () {
+            state.filterCells[$(this).attr('data-field')] = $(this);
+          });
+
           var table = $table.DataTable(options);
 
           if (historyDefaults) {
@@ -903,6 +1235,11 @@
             else {
               $(window).one('load', remeasure);
             }
+          }
+          // A table with a fixed height keeps the widths in sync between the
+          // header and the body; there DataTables has to set them.
+          if (!options.scrollY && !options.scrollX) {
+            nativeColumnWidths(table);
           }
           if (cfg && cfg.fillHeight !== null && cfg.fillHeight !== undefined && table.scroller) {
             fillHeight(table, cfg.fillHeight);

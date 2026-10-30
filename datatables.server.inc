@@ -217,6 +217,214 @@ function datatables_server_join_field_tables($view) {
 }
 
 /**
+ * Reads an operator expression from the text of a column filter.
+ *
+ * Supported: "> x", ">= x", "< x", "<= x", "= x", "!= x" (also "<>"), "! x" (does not contain), and the
+ * range "a - b" (dash with spaces) or "a..b". Everything else is a plain
+ * "contains" search.
+ *
+ * @return array|null
+ *   NULL if the text is no expression. Otherwise array('op' => ..., 'a' =>
+ *   first value or NULL while the value is still being typed, 'b' => second
+ *   value of a range) where op is one of >, >=, <, <=, =, !=, ! (does not
+ *   contain), between.
+ */
+function datatables_filter_parse($text) {
+  $text = trim($text);
+  $m = array();
+  if (preg_match('/^(>=|<=|<>|!=|>|<|=|!)\s*(.*)$/s', $text, $m)) {
+    $op = ($m[1] == '<>') ? '!=' : $m[1];
+    $value = trim($m[2]);
+    return array('op' => $op, 'a' => ($value === '') ? NULL : $value, 'b' => NULL);
+  }
+  if (preg_match('/^(.+?)(?:\s+-\s+|\.\.)(.+)$/s', $text, $m)) {
+    return array('op' => 'between', 'a' => trim($m[1]), 'b' => trim($m[2]));
+  }
+  return NULL;
+}
+
+/**
+ * Turns a date as typed in a filter into the period it stands for.
+ *
+ * Accepted: YYYY, YYYY-MM, YYYY-MM-DD, YYYY-MM-DD HH[:MM[:SS]], D.M.YYYY and
+ * M.YYYY. The period is the whole year, month, day, ... that was given.
+ *
+ * @return array|null
+ *   array(first timestamp of the period, first timestamp after it) in the
+ *   time zone of the user, or NULL if the text is no date.
+ */
+function datatables_server_parse_date($text, $timezone) {
+  $m = array();
+  $text = trim($text);
+  $parts = NULL;
+  if (preg_match('/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2})(?:[ T](\d{1,2})(?::(\d{2})(?::(\d{2}))?)?)?)?)?$/', $text, $m)) {
+    $parts = array(
+      'y' => (int) $m[1],
+      'm' => isset($m[2]) && $m[2] !== '' ? (int) $m[2] : NULL,
+      'd' => isset($m[3]) && $m[3] !== '' ? (int) $m[3] : NULL,
+      'h' => isset($m[4]) && $m[4] !== '' ? (int) $m[4] : NULL,
+      'i' => isset($m[5]) && $m[5] !== '' ? (int) $m[5] : NULL,
+      's' => isset($m[6]) && $m[6] !== '' ? (int) $m[6] : NULL,
+    );
+  }
+  elseif (preg_match('/^(?:(\d{1,2})\.)?(\d{1,2})\.(\d{4})$/', $text, $m)) {
+    $parts = array(
+      'y' => (int) $m[3],
+      'm' => (int) $m[2],
+      'd' => $m[1] !== '' ? (int) $m[1] : NULL,
+      'h' => NULL, 'i' => NULL, 's' => NULL,
+    );
+  }
+  if (!$parts || $parts['y'] < 1000) {
+    return NULL;
+  }
+  $month = $parts['m'] !== NULL ? $parts['m'] : 1;
+  $day = $parts['d'] !== NULL ? $parts['d'] : 1;
+  if ($month < 1 || $month > 12 || !checkdate($month, $day, $parts['y'])) {
+    return NULL;
+  }
+  $hour = (int) $parts['h'];
+  $minute = (int) $parts['i'];
+  $second = (int) $parts['s'];
+  if ($hour > 23 || $minute > 59 || $second > 59) {
+    return NULL;
+  }
+  try {
+    $zone = new DateTimeZone($timezone);
+    $start = new DateTime(sprintf('%04d-%02d-%02d %02d:%02d:%02d', $parts['y'], $month, $day, $hour, $minute, $second), $zone);
+  }
+  catch (Exception $e) {
+    return NULL;
+  }
+  $step = '+1 year';
+  foreach (array('s' => '+1 second', 'i' => '+1 minute', 'h' => '+1 hour', 'd' => '+1 day', 'm' => '+1 month') as $key => $modify) {
+    if ($parts[$key] !== NULL) {
+      $step = $modify;
+      break;
+    }
+  }
+  $next = clone $start;
+  $next->modify($step);
+  return array($start->getTimestamp(), $next->getTimestamp());
+}
+
+/**
+ * Builds the SQL condition of an operator expression of a column filter.
+ *
+ * @param string $sql
+ *   "table_alias.column".
+ * @param array $parsed
+ *   See datatables_filter_parse().
+ * @param string $kind
+ *   'date', 'number' or 'text', see datatables_column_kind().
+ *
+ * @return object|null
+ *   A condition, or NULL when the value cannot be used (yet), in which case
+ *   the filter is ignored.
+ */
+function datatables_server_operator_condition($sql, array $parsed, $kind, $date_info = NULL) {
+  $op = $parsed['op'];
+  if ($op == '!' && $kind != 'text') {
+    // "Does not contain" means "not equal" for dates and numbers.
+    $op = $parsed['op'] = '!=';
+  }
+  if ($parsed['a'] === NULL || ($op == 'between' && $parsed['b'] === NULL)) {
+    return NULL;
+  }
+
+  if ($kind == 'date') {
+    $date_info = $date_info ? $date_info : array('storage' => 'int', 'zone' => backdrop_get_user_timezone());
+    $a = datatables_server_parse_date($parsed['a'], $date_info['zone']);
+    $b = ($op == 'between') ? datatables_server_parse_date($parsed['b'], $date_info['zone']) : NULL;
+    if (!$a || ($op == 'between' && !$b)) {
+      return NULL;
+    }
+    // The stored format: timestamps or date strings (compared as text, which
+    // keeps the order because the strings are fixed length).
+    $format = array('int' => NULL, 'datetime' => 'Y-m-d H:i:s', 'iso' => 'Y-m-d\\TH:i:s', 'dateonly' => 'Y-m-d');
+    $format = $format[$date_info['storage']];
+    if ($format) {
+      foreach (array(&$a, &$b) as &$period) {
+        if ($period) {
+          $period = array(gmdate($format, $period[0]), gmdate($format, $period[1]));
+        }
+      }
+      unset($period);
+    }
+    switch ($op) {
+      case '=':
+        return db_and()->condition($sql, $a[0], '>=')->condition($sql, $a[1], '<');
+
+      case '!=':
+        return db_or()->condition($sql, $a[0], '<')->condition($sql, $a[1], '>=');
+
+      case '>':
+        return db_and()->condition($sql, $a[1], '>=');
+
+      case '>=':
+        return db_and()->condition($sql, $a[0], '>=');
+
+      case '<':
+        return db_and()->condition($sql, $a[0], '<');
+
+      case '<=':
+        return db_and()->condition($sql, $a[1], '<');
+
+      case 'between':
+        return db_and()->condition($sql, $a[0], '>=')->condition($sql, $b[1], '<');
+    }
+    return NULL;
+  }
+
+  $values = array($parsed['a'], $parsed['b']);
+  if ($kind == 'number') {
+    foreach ($values as $i => $value) {
+      if ($value === NULL) {
+        continue;
+      }
+      // Both "1.5" and "1,5" are accepted.
+      $normalized = (strpos($value, '.') === FALSE) ? str_replace(',', '.', $value) : str_replace(',', '', $value);
+      if (!is_numeric($normalized)) {
+        return NULL;
+      }
+      $values[$i] = $normalized + 0;
+    }
+  }
+  switch ($op) {
+    case '=':
+      return db_and()->condition($sql, $values[0]);
+
+    case '!':
+      return db_or()->condition($sql, '%' . db_like($values[0]) . '%', 'NOT LIKE')->isNull($sql);
+
+    case '!=':
+      $or = db_or()->condition($sql, $values[0], '<>');
+      if ($kind == 'text') {
+        $or->isNull($sql);
+      }
+      return $or;
+
+    case 'between':
+      return db_and()->condition($sql, $values[0], '>=')->condition($sql, $values[1], '<=');
+
+    case '<=':
+    case '>':
+      if ($kind == 'text') {
+        // A text stands for everything that starts with it (like "2025"
+        // stands for the whole year): "<=B" includes "Banana", ">B" does not.
+        $like = db_like($values[0]) . '%';
+        if ($op == '<=') {
+          return db_or()->condition($sql, $values[0], '<=')->condition($sql, $like, 'LIKE');
+        }
+        return db_and()->condition($sql, $values[0], '>')->condition($sql, $like, 'NOT LIKE');
+      }
+
+    default:
+      return db_and()->condition($sql, $values[0], $op);
+  }
+}
+
+/**
  * Adds DataTables search, column filters and paging to an already built View.
  *
  * Called from hook_views_post_build(). The conditions are added to the final
@@ -259,7 +467,7 @@ function datatables_server_apply_request($view, array $request, $role = 'main', 
     // Column filters come from the style options, never from the request.
     $mode = isset($filters[$id]) ? $filters[$id] : 'none';
     if ($col['search'] !== '' && in_array($mode, array('text', 'select')) && $id !== $exclude) {
-      $column_conditions[] = array($sql, $col['search'], $mode);
+      $column_conditions[] = array($sql, $col['search'], $mode, datatables_column_kind($view->field[$id]), datatables_date_column_info($view->field[$id]));
     }
   }
   $tokens = ($request['search'] === '') ? array() : preg_split('/\s+/', $request['search']);
@@ -279,8 +487,22 @@ function datatables_server_apply_request($view, array $request, $role = 'main', 
       foreach ($column_conditions as $c) {
         if ($c[2] == 'select') {
           $query->condition($c[0], $c[1]);
+          continue;
         }
-        else {
+        // Text filter: an operator at the start (">2025", "=abc", "1 - 5")
+        // compares, anything else means "contains".
+        $parsed = datatables_filter_parse($c[1]);
+        if ($parsed && $parsed['op'] == 'between' && $c[3] == 'text') {
+          // Ranges are for dates and numbers; text with a dash is searched.
+          $parsed = NULL;
+        }
+        if ($parsed && $c[3] != 'none') {
+          $condition = datatables_server_operator_condition($c[0], $parsed, $c[3], $c[4]);
+          if ($condition) {
+            $query->condition($condition);
+          }
+        }
+        elseif (!$parsed) {
           $query->condition($c[0], '%' . db_like($c[1]) . '%', 'LIKE');
         }
       }
@@ -360,6 +582,61 @@ function datatables_server_total_count($view, array $request) {
   }
   $helper->execute();
   return (int) $helper->total_rows;
+}
+
+/**
+ * Finds the display labels for the stored values of a field.
+ *
+ * Done for the fields whose stored value is not what the table shows:
+ *  - list fields (text, integer, float, boolean): the label of the allowed
+ *    value,
+ *  - entity reference and taxonomy term reference fields: the label of the
+ *    referenced entity (only entities the current user may view; for others
+ *    the stored id stays).
+ * Modules can still change any label with hook_datatables_filter_options_alter().
+ *
+ * @param views_handler $handler
+ *   The field handler.
+ * @param array $values
+ *   The stored values.
+ *
+ * @return array
+ *   Labels keyed by stored value; values without a label are left out.
+ */
+function datatables_server_value_labels($handler, array $values) {
+  $labels = array();
+  if (!($handler instanceof views_handler_field_field) || empty($handler->definition['field_name']) || !$values) {
+    return $labels;
+  }
+  $field = field_info_field($handler->definition['field_name']);
+  if (!$field) {
+    return $labels;
+  }
+
+  if (in_array($field['type'], array('list_text', 'list_integer', 'list_float', 'list_boolean')) && function_exists('list_allowed_values')) {
+    $allowed = list_allowed_values($field);
+    foreach ($values as $value) {
+      if (isset($allowed[$value]) && is_scalar($allowed[$value])) {
+        $labels[$value] = (string) $allowed[$value];
+      }
+    }
+  }
+  elseif (in_array($field['type'], array('entityreference', 'taxonomy_term_reference'))) {
+    $entity_type = ($field['type'] == 'entityreference') ? (isset($field['settings']['target_type']) ? $field['settings']['target_type'] : NULL) : 'taxonomy_term';
+    if ($entity_type && entity_get_info($entity_type)) {
+      $ids = array_values(array_filter($values, 'is_numeric'));
+      $entities = $ids ? entity_load_multiple($entity_type, $ids) : array();
+      foreach ($entities as $id => $entity) {
+        if (entity_access('view', $entity_type, $entity)) {
+          $label = entity_label($entity_type, $entity);
+          if ($label !== NULL && $label !== '') {
+            $labels[$id] = (string) $label;
+          }
+        }
+      }
+    }
+  }
+  return $labels;
 }
 
 /**
@@ -467,6 +744,17 @@ function datatables_server_filter_options($view, array $request) {
         }
       }
       $labels[$value] = $label;
+    }
+    // Fields that store a key or an id: show what the table shows.
+    $field_labels = datatables_server_value_labels($handler, $values);
+    if ($field_labels) {
+      foreach ($field_labels as $value => $label) {
+        $labels[$value] = truncate_utf8(trim(preg_replace('/\s+/', ' ', decode_entities(strip_tags($label)))), 100, TRUE, TRUE);
+      }
+      // The values were sorted by what is stored, not by what is shown.
+      uasort($labels, function ($a, $b) {
+        return strnatcasecmp($a, $b);
+      });
     }
     backdrop_alter('datatables_filter_options', $labels, $view, $id);
 

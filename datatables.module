@@ -285,6 +285,8 @@ function template_preprocess_datatables_view(&$vars) {
 
   $position = 0;
   $column_filters = array();
+  $column_kinds = array();
+  $column_zones = array();
   $column_split = array();
   $date_fields = array();
   $serverside = $is_serverside;
@@ -366,6 +368,13 @@ function template_preprocess_datatables_view(&$vars) {
       if (in_array($filter_mode, array('text', 'select'))) {
         if (!$is_serverside || datatables_server_field_target($fields[$field])) {
           $column_filters[$field] = $filter_mode;
+          if ($filter_mode == 'text') {
+            $column_kinds[$field] = datatables_column_kind($fields[$field]);
+            if ($column_kinds[$field] == 'date') {
+              $info = datatables_date_column_info($fields[$field]);
+              $column_zones[$field] = $info['zone'];
+            }
+          }
           // A field that shows several values in one cell is split, so the
           // drop-down offers every single value (client-side filtering).
           $item_split = _datatables_item_split($fields[$field]);
@@ -478,15 +487,10 @@ function template_preprocess_datatables_view(&$vars) {
   if ($date_fields) {
     foreach ($vars['rows'] as $count => $row) {
       foreach (array_keys($date_fields) as $field) {
-        if (!isset($view->result[$count]) || empty($fields[$field]->field_alias)) {
+        if (!isset($view->result[$count])) {
           continue;
         }
-        $raw = isset($view->result[$count]->{$fields[$field]->field_alias}) ? $view->result[$count]->{$fields[$field]->field_alias} : '';
-        if (is_numeric($raw)) {
-          // Timestamps: fixed length, so text order is numeric order.
-          $raw = sprintf('%012d', max(0, (int) $raw));
-        }
-        $vars['data_order'][$count][$field] = (string) $raw;
+        $vars['data_order'][$count][$field] = datatables_date_sort_key($fields[$field], $view->result[$count]);
       }
     }
   }
@@ -496,6 +500,10 @@ function template_preprocess_datatables_view(&$vars) {
     'serverSide' => $serverside,
     'filters' => $column_filters,
     'split' => $column_split,
+    // How the text filter compares the values with an operator.
+    'kinds' => $column_kinds,
+    'zones' => $column_zones,
+    'timezone' => backdrop_get_user_timezone(),
     'cascade' => !empty($options['filter_options']['cascade']),
     // A table with a fixed height scrolls its body inside the page; its
     // header stays in place without any help.
@@ -924,6 +932,181 @@ function _datatables_item_split($handler) {
 /**
  * Whether a field handler outputs a date.
  */
+/**
+ * Tells how the values of a column are compared by operators in the text
+ * filter (">", "<", "=", ranges): 'date' (timestamps), 'number', 'text', or
+ * 'none' when the stored value is not a plain comparable value.
+ */
+function datatables_column_kind($handler) {
+  if (datatables_date_column_info($handler)) {
+    return 'date';
+  }
+  if ($handler instanceof views_handler_field_datetime) {
+    // Date strings of unknown format: not supported, a plain text comparison
+    // would be wrong.
+    return 'none';
+  }
+  if ($handler instanceof views_handler_field_numeric) {
+    return 'number';
+  }
+  // A plain column of a custom table (for example views_exposed_table).
+  if (get_class($handler) == 'views_handler_field' && datatables_column_db_type($handler) == 'number') {
+    return 'number';
+  }
+  if ($handler instanceof views_handler_field_field && !empty($handler->definition['field_name'])) {
+    $field = field_info_field($handler->definition['field_name']);
+    if ($field && in_array($field['type'], array('number_integer', 'number_decimal', 'number_float', 'list_integer', 'list_float'))) {
+      return 'number';
+    }
+    if ($field && (strpos($field['type'], 'date') !== FALSE)) {
+      return 'none';
+    }
+  }
+  return 'text';
+}
+
+/**
+ * Describes how a date column is stored and in which time zone it is shown.
+ *
+ * @return array|null
+ *   NULL if the handler is not a date column that operators can be used on.
+ *   Otherwise array('storage' => 'int' (timestamp), 'datetime' (Y-m-d H:i:s)
+ *   or 'iso' (Y-m-d\TH:i:s), 'zone' => the time zone in which dates typed by
+ *   the user are read). For Field API date fields with the time zone handling
+ *   "none" or "date" the stored value is the displayed wall clock time, which
+ *   is expressed as zone UTC.
+ */
+function datatables_date_column_info($handler) {
+  if ($handler instanceof views_handler_field_date) {
+    $zone = !empty($handler->options['timezone']) ? $handler->options['timezone'] : backdrop_get_user_timezone();
+    return array('storage' => 'int', 'zone' => $zone);
+  }
+  if ($handler instanceof views_handler_field_field && !empty($handler->definition['field_name'])) {
+    $field = field_info_field($handler->definition['field_name']);
+    if (!$field || !in_array($field['type'], array('datetime', 'date', 'datestamp'))) {
+      return NULL;
+    }
+    $handling = isset($field['settings']['tz_handling']) ? $field['settings']['tz_handling'] : 'site';
+    if ($handling == 'utc') {
+      $zone = 'UTC';
+    }
+    elseif ($handling == 'none' || $handling == 'date') {
+      $zone = 'UTC';
+    }
+    else {
+      $zone = backdrop_get_user_timezone();
+    }
+    $storage = array('datetime' => 'datetime', 'date' => 'iso', 'datestamp' => 'int');
+    return array('storage' => $storage[$field['type']], 'zone' => $zone);
+  }
+  // A DATETIME / DATE / TIMESTAMP column of a custom table: the value is
+  // compared as written, so the time zone is not converted.
+  if ($handler instanceof views_handler_field && !($handler instanceof views_handler_field_field)) {
+    $type = datatables_column_db_type($handler);
+    if ($type == 'datetime' || $type == 'date') {
+      return array('storage' => ($type == 'date') ? 'dateonly' : 'datetime', 'zone' => 'UTC');
+    }
+  }
+  return NULL;
+}
+
+/**
+ * Finds out the type of the database column behind a field handler.
+ *
+ * Needed for the columns of custom tables, where Views only knows a plain
+ * field handler. Uses the table definition of the database (MySQL), or the
+ * Schema API as a fallback.
+ *
+ * @return string|null
+ *   'datetime' (DATETIME or TIMESTAMP), 'date' (DATE), 'number' (integer and
+ *   decimal columns), or NULL if not known or something else.
+ */
+function datatables_column_db_type($handler) {
+  static $tables = array();
+  $table = isset($handler->table) ? $handler->table : '';
+  $column = !empty($handler->real_field) ? $handler->real_field : '';
+  if (!preg_match('/^[A-Za-z0-9_]+$/', $table) || !preg_match('/^[A-Za-z0-9_]+$/', $column)) {
+    return NULL;
+  }
+  if (!isset($tables[$table])) {
+    $tables[$table] = array();
+    try {
+      if (Database::getConnection()->databaseType() == 'mysql') {
+        foreach (db_query('SHOW COLUMNS FROM {' . $table . '}') as $row) {
+          $tables[$table][$row->Field] = strtolower($row->Type);
+        }
+      }
+    }
+    catch (Exception $e) {
+      // Not a table of the default database.
+    }
+    if (!$tables[$table]) {
+      $schema = backdrop_get_schema($table);
+      if ($schema) {
+        foreach ($schema['fields'] as $name => $spec) {
+          $tables[$table][$name] = strtolower(!empty($spec['mysql_type']) ? $spec['mysql_type'] : (!empty($spec['pgsql_type']) ? $spec['pgsql_type'] : $spec['type']));
+        }
+      }
+    }
+  }
+  if (empty($tables[$table][$column])) {
+    return NULL;
+  }
+  $type = $tables[$table][$column];
+  if (preg_match('/^(datetime|timestamp)/', $type)) {
+    return 'datetime';
+  }
+  if (strpos($type, 'date') === 0) {
+    return 'date';
+  }
+  if (preg_match('/^(tinyint|smallint|mediumint|int|integer|bigint|serial|decimal|numeric|float|double|real)/', $type) && !preg_match('/^tinyint\(1\)/', $type)) {
+    return 'number';
+  }
+  return NULL;
+}
+
+/**
+ * Returns the sort key of a date cell: a fixed length timestamp.
+ *
+ * @return string
+ *   Empty if the row has no value.
+ */
+function datatables_date_sort_key($handler, $result) {
+  $info = datatables_date_column_info($handler);
+  $raw = '';
+  if ($info && $handler instanceof views_handler_field_field) {
+    $items = $handler->get_value($result);
+    $value = '';
+    if (is_array($items) && isset($items[0])) {
+      $item = isset($items[0]['raw']) ? $items[0]['raw'] : $items[0];
+      $value = isset($item['value']) ? $item['value'] : '';
+    }
+    if ($value === '' || $value === NULL) {
+      return '';
+    }
+    if ($info['storage'] == 'int') {
+      $raw = (int) $value;
+    }
+    else {
+      $stamp = strtotime(str_replace('T', ' ', $value) . ' UTC');
+      $raw = ($stamp === FALSE) ? '' : $stamp;
+    }
+  }
+  elseif (!empty($handler->field_alias) && isset($result->{$handler->field_alias})) {
+    $raw = $result->{$handler->field_alias};
+    if ($info && $info['storage'] != 'int' && $raw !== '' && !is_numeric($raw)) {
+      // A date string of a custom table, read as written.
+      $stamp = strtotime($raw . ' UTC');
+      $raw = ($stamp === FALSE) ? '' : $stamp;
+    }
+  }
+  if (is_numeric($raw)) {
+    // Fixed length, so text order is numeric order.
+    return sprintf('%012d', max(0, (int) $raw));
+  }
+  return (string) $raw;
+}
+
 function _datatables_is_date_field($handler) {
-  return $handler instanceof views_handler_field_date || $handler instanceof views_handler_field_datetime;
+  return $handler instanceof views_handler_field_date || $handler instanceof views_handler_field_datetime || datatables_date_column_info($handler);
 }
