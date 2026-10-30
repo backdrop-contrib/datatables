@@ -15,52 +15,89 @@ For full documentation and examples, visit the DataTables website: [https://data
 
 - Install this module using the [official Backdrop CMS instructions](([https://docs.backdropcms.org/documentation/extend-with-modules](https://docs.backdropcms.org/documentation/extend-with-modules)).
 - There are two ways you can use DataTables:
-
 1. Create a View and use the DataTables display format.
-2. Use theme_datatable function in your own module code. Detaileddocumentation is included with the function.
+2. Use theme_datatable function in your own module code. Detailed documentation is included with the function.
 
+## Features
 
-## Server-side processing
+### Server-side processing
 
-Whether DataTables works in the browser or asks the server for every page isderived from the Views settings:
+Whether DataTables works in the browser or asks the server for every page is derived from the Views settings:
 
-- **Display uses AJAX** (Advanced settings: *Use AJAX*) and the paginationstyle is not *No Pagination*: **server-side processing**.
+- **Display uses AJAX** (Advanced settings: *Use AJAX*) and the pagination style is not *No Pagination*: **server-side processing**.
 - Otherwise: all rows are loaded at once and DataTables works client-side.
 
-With server-side processing every page, sort and search request is sent toBackdrop's own Views Ajax callback (`views/ajax`).Views therefore performs the access check of the display, applies contextualarguments and exposed filters, and the rows are rendered by the same code asthe normal table (combined columns, excluded fields, row classes).
+With server-side processing every page, sort and search request is sent to Backdrop's own Views Ajax callback (`views/ajax`). Views therefore performs the access check of the display, applies contextual arguments and exposed filters, and the rows are rendered by the same code as the normal table (combined columns, excluded fields, row classes).
 
-### Notes:
+#### Notes:
 
-- Set **Caching: None** on the display. Server-side requests ignore the Viewscache.
-- Sorting uses the `click_sort()` of the field handlers, so only columns thatare "sortable" in the style settings and click-sortable can be ordered.
+- Set **Caching: None** on the display. Server-side requests ignore the Views cache.
+- Sorting uses the `click_sort()` of the field handlers, so only columns that are "sortable" in the style settings and click-sortable can be ordered.
 - Global search (search box) and column filters are applied with SQL `LIKE` /`=` on the real database column of each field. Columns that have no suchcolumn (global fields, Field API fields, custom text) are not searched.
-- At most 1000 rows are returned per request; "All" is not offered in thelength menu.
-- The exposed filters of the view keep working: submitting the exposed formre-renders the view through Views Ajax, and the new filter values are sentalong with every following DataTables request.
+- At most 1000 rows are returned per request; "All" is not offered in the length menu.
+- The exposed filters of the view keep working: submitting the exposed form re-renders the view through Views Ajax, and the new filter values are sent along with every following DataTables request.
 
 ### Views preview
 
-The preview of the Views editor is reloaded after every change and alwaysworks client-side. To keep it fast it only loads the number of rows set under*Pagination and Page Length: Rows in the Views preview* (default 100, 0 = all);a caption tells when rows were left out. The real page is not affected. If itis still too slow, switch off *Auto preview* below the view settings.
+The preview of the Views editor is reloaded after every change and always works client-side. To keep it fast it only loads the number of rows set under*Pagination and Page Length: Rows in the Views preview* (default 100, 0 = all); a caption tells when rows were left out. The real page is not affected. If itis still too slow, switch off *Auto preview* below the view settings.
 
 ## Column filters
 
-Under *Column filters* in the style settings each column can get a filter in asecond header row: a **text box**, or a **drop-down with the distinct values**of the column (similarly as in the Views Selective Filters module).
+Under *Column filters* in the style settings each column can get a filter in a second header row: a **text box**, or a **drop-down with the distinct values** of the column (similarly as in the Views Selective Filters module).
 
 - Client-side processing: the values are read from the table.
-- Server-side processing: the values are read from the database with thequery of the view itself (as a derived table), so they work for any Viewsbase table. With *Only list values that are stillpossible* the list contains only values that exist in the rows left by theexposed filters, contextual arguments, the other column filters and thesearch box. The column's own filter is ignored, so the user can select another option.
-- If a column has more distinct values than the configured maximum, a textbox is shown instead.
-- Searchable and filterable are columns that read a plain database column andField API fields (their main column, joined only when a search or filter onit is requested). With server-side processing, columns that cannot befiltered in SQL (aggregated fields, formulas, global fields) get no filtercontrol.
-- Values are the raw database values (dates are shown formatted, markup isstripped from the labels). To show other labels (e.g. names forids) implement `hook_datatables_filter_options_alter(&$options, $view, $field_id)`, where `$options` is an array `value => label`.
-- Fields with several values: if a Field API field is set to "Display allvalues in the same row" (as unordered list, ordered list or with aseparator), the drop-down offers every single value as its own option, andchoosing one shows all rows that contain this value. With server-sideprocessing the values are read from the field table; without it the cellis split according to the field's list type or separator. Rows are neverrepeated when several values of a row match. A value that itself containsthe separator string cannot be told apart in client-side mode; use a listtype or another separator in that case.
+- Server-side processing: the values are read from the database with the query of the view itself (as a derived table), so they work for any Views base table. With *Only list values that are still possible* the list contains only values that exist in the rows left by the exposed filters, contextual arguments, the other column filters and the search box. The column's own filter is ignored, so the user can select another option.
+- If a column has more distinct values than the configured maximum, a text box is shown instead.
+- Searchable and filterable are columns that read a plain database column and Field API fields (their main column, joined only when a search or filter on it is requested). With server-side processing, columns that cannot be filtered in SQL (aggregated fields, formulas, global fields) get no filter control.
+- Values are the raw database values (dates are shown formatted, markup is stripped from the labels). To show other labels (e.g. names for ids) implement `hook_datatables_filter_options_alter(&$options, $view, $field_id)`, where `$options` is an array `value => label`.
+- Fields with several values: if a Field API field is set to "Display all values in the same row" (as unordered list, ordered list or with a separator), the drop-down offers every single value as its own option, and choosing one shows all rows that contain this value. With server-side processing the values are read from the field table; without it the cell is split according to the field's list type or separator. Rows are never repeated when several values of a row match. A value that itself contains the separator string cannot be told apart in client-side mode; use a list type or another separator in that case.
 
 Filters of hidden columns are not shown.
+
+### Operators in column filters
+
+The text box column filters accept an operator at the start of the input:
+
+| Input                                | Meaning                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `>2025`, `>=2025`, `<2025`, `<=2025` | greater / less than (or equal)                                             |
+| `=2025`, `!=2025` (also `<>`)        | exact match / not equal                                                    |
+| `!abc`                               | text only: does not contain "abc" (for dates and numbers the same as `!=`) |
+| `2020 - 2023` or `2020..2023`        | range (inclusive); the dash needs spaces around it                         |
+
+* **Dates** are compared independently of the display format. Accepted
+  values: `2025`, `2025-03`, `2025-03-14`, `2025-03-14 12:30`, `14.3.2025`,
+  `3.2025`. `=2025` matches the whole year, `>2025` means after the year 2025.
+  Comparison uses the user's time zone.
+* **Numbers** accept a dot or a comma as decimal separator.
+* **Text** columns support `=`, `!=` and the comparison operators as string
+  comparisons (alphabetical, not natural number order). A text stands for
+  everything that starts with it, like a year stands for all its days: `<=B`
+  includes "Banana", `>B` does not. A dash in text is just a normal "contains"
+  search.
+* **Columns of custom tables** (for example with views_exposed_table) that are
+  shown with a plain Views field handler are recognized by their database type:
+  DATETIME, TIMESTAMP and DATE columns get the date operators (the stored value
+  is compared as written, without time zone conversion), integer and decimal
+  columns get the number operators.
+* An incomplete or unparsable operand (for example `>` or `>abc`) is ignored.
+* Date columns of Backdrop (created, changed, ...) and Field API date fields
+  (Date, Date (ISO format), Date (Unix timestamp)) are supported. Dates are read in
+  the time zone the field is shown in (user/site time zone, UTC, or the stored
+  wall clock time for the time zone handling "none" or "date" - for the latter
+  the time zone of each value is not taken into account). Only the start date
+  of a date range field is compared.
+* The tooltip of a filter box lists only the operators that work for its column;
+  columns the operators cannot be used on have no hint.
+* Works in client-side and server-side mode.
 
 ## Sticky header
 
 The style option *Sticky table header* keeps the column titles and the filterrow at the top of the window while the page scrolls. It uses CSS(`position: sticky`) on the real header, not Backdrop's cloned header, andrespects the administration bar (elements with a `data-offset-top` attribute)and any `<header>` element of the theme that is fixed or sticky at the top ofthe window (its current height is followed while scrolling, so shrinkingheaders work). Other fixed bars, e.g. a `div`, can be named in the style option*Fixed elements above the sticky header* as a CSS selector.It is not active in the Views preview or together with a fixed table height(Scroller), where the header does not scroll away anyway. The theme must notset `overflow` on a parent element of the table, as that disables stickypositioning.
 
-The filter row is not part of exports (copy, CSV, Excel, PDF, print): only thecolumn titles are exported as header.
+The filter row is not part of exports (copy, CSV, Excel, PDF, print): only the column titles are exported as header.
 
-## Responsive behavior
+## Responsive behaviour
 
 The table is always responsive: when it is too wide for its container (also while the window is being resized), DataTables hides columns, and a click on a row shows the hidden values below it. Which columns go first is derived from the per-column *Responsive priority* of the table style settings (the same setting as for the regular Views table):
 
@@ -73,6 +110,10 @@ Among columns of the same priority the right-most is hidden first. A column set 
 ## Dates and alignment
 
 Client-side sorting uses the raw value of the date (written to the cells as `data-order`), so it is independent of the date format. The alignment of the style settings applies.
+
+## Scroller: using the height of the window
+
+The style option *Vertical height* (pagination style *Scroller*) takes a number of pixels or any CSS length, e.g. `400px` or `calc(100vh - 300px)`. With the value `fill` the table body uses all the height of the window down to its bottom; `fill 40` keeps 40 pixels free below the table (default 20), e.g. for a footer. The height is measured in the browser and calculated again when the window is resized or the layout of the table changes. It is at least 120 pixels high.
 
 ## AJAX history (table state in the URL)
 
@@ -88,7 +129,7 @@ With server-side processing the table only holds the rows of the current page. U
 
 ## Export buttons and options for developers
 
-With the style option *Buttons* enabled, the **Export** menu offers Copy, CSV, Excel, PDF and Print. In contrast to DataTables' default, the page title is not writtenby default as first row/line to the Copy and Excel output.
+With the style option *Buttons* enabled, the **Export** menu offers Copy, CSV, Excel, PDF and Print. In contrast to DataTables' default, the page title is not written by default as first row/line to the Copy and Excel output.
 
 Modules can change the buttons with `hook_datatables_export_buttons_alter()` (see `datatables.api.php`). The hook receives the button definitions keyed by `copy`, `csv`, `excel`, `pdf` and `print`; every value holds the options documented for that button, e.g. at [https://datatables.net/reference/button/excel](https://datatables.net/reference/button/excel). Unset a key to remove a button, add a key to offer another one.
 
@@ -107,7 +148,8 @@ Options that are JavaScript functions (e.g. `customize`) cannot be written in PH
 `hook_datatables_options_alter()` receives all options of a table (columns, paging, language, buttons, ...) to change anything else.
 
 ## Differences from Drupal 7
-- In contrast to the Drupal module, which used DataTables v1.9 from 2012, theBackdrop module uses DataTables v2.x.
+
+- In contrast to the Drupal module, which used DataTables v1.9 from 2012, the Backdrop module uses DataTables v2.x.
 - The DataTables library and used extensions are already packaged with this module and do not need to be installed separately.
 - DataTables requires jQuery 1.7 or newer which is already included in Backdrop.
 
@@ -138,4 +180,4 @@ This project is GPL v2 software. See the LICENSE.txt file in this directory for 
 
 The DataTables library is available under the [MIT license](https://www.datatables.net/license/mit).
 
- 
+## 
