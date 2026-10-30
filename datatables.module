@@ -429,11 +429,6 @@ function template_preprocess_datatables_view(&$vars) {
     : [10, 25, 50, 100, [ 'label' => 'All', 'value' => -1 ]];
   $datatable_options['pageLength'] = (int) $options['pages']['display_length'];
 
-  // Enable ThemeRoller support, if necessary.
-  if ($options['layout']['themeroller']) {
-    $datatable_options['jQueryUI'] = TRUE;
-  }
-
   // Pass the sDOM parameter, if one is specified.
   // Keep sdom config name for backwards compatibility with Drupal/DataTables1.x.
   if ($options['layout']['sdom']) {

@@ -30,7 +30,6 @@ class datatables_style_plugin extends views_plugin_style_table {
     $options['layout'] = array(
       'default' => array(
         'autowidth' => FALSE,
-        'themeroller' => FALSE,
         'sdom' => '',
       ),
     );
@@ -158,13 +157,6 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Layout and Display'),
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
-    );
-
-    $form['layout']['themeroller'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Enable jQuery UI ThemeRoller Support (Deprecated)'),
-      '#default_value' => !empty($this->options['layout']['themeroller']),
-      '#description' => t("Create markup and classes to support jQuery UI's ThemeRoller"),
     );
 
     $form['layout']['sdom'] = array(
