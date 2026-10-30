@@ -1352,3 +1352,19 @@ function datatables_bulk_verify_ids($view, $handler, array $ids) {
   }
   return $allowed;
 }
+
+/**
+ * Element validate callback: the value must be a positive integer.
+ *
+ * Backdrop core has no such validator (it relies on number elements), and the
+ * display length is a textfield.
+ */
+function datatables_validate_positive_integer($element, &$form_state) {
+  $value = $element['#value'];
+  if ($value === '' || $value === NULL) {
+    return;
+  }
+  if (!preg_match('/^[0-9]+$/', (string) $value) || (int) $value < 1) {
+    form_error($element, t('%name must be a positive integer.', array('%name' => $element['#title'])));
+  }
+}

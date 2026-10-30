@@ -169,7 +169,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#default_value' => isset($this->options['elements']['export_limit']) ? $this->options['elements']['export_limit'] : 10000,
       '#min' => 1,
       '#description' => t('Protects the server and the browser: large exports need a lot of memory and time, PDF files in particular. If more rows match, only the first ones are exported and the user is told. This limit is enforced on the server.'),
-      '#element_validate' => array('element_validate_integer_positive'),
+      '#element_validate' => array('datatables_validate_positive_integer'),
       '#states' => array(
         'visible' => array(
           ':input[name="style_options[elements][table_tools]"]' => array('checked' => TRUE),
@@ -249,7 +249,7 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#description' => t('Default number of records to show per page. May be adjusted by users if Length Selection is enabled.'),
       '#size'=> 10,
       '#default_value' => isset($this->options['pages']['display_length']) ? $this->options['pages']['display_length'] : 10,
-      '#element_validate' => array('element_validate_integer_positive'),
+      '#element_validate' => array('datatables_validate_positive_integer'),
       '#states' => array(
         'visible' => array(
           ':input[name="style_options[pages][pagination_style]"]' => array(
