@@ -1164,6 +1164,83 @@ function datatables_field_filterable($handler) {
 /**
  * Implements hook_form_alter().
  *
+ * Keeps the style options when a display is switched between the core Table
+ * and DataTables styles (and back): the options they have in common are
+ * copied, the DataTables specific ones are kept aside until the style is
+ * switched back.
+ */
+function datatables_form_views_ui_edit_display_form_alter(&$form, &$form_state) {
+  $section = isset($form_state['section']) ? $form_state['section'] : '';
+  if ($section == 'style_plugin') {
+    $display = $form_state['view']->display[$form_state['display_id']];
+    $form_state['datatables_old_style'] = $display->handler->get_option('style_plugin');
+    $form_state['datatables_old_options'] = $display->handler->get_option('style_options');
+    $form['actions']['submit']['#submit'][] = 'datatables_style_switch_restore';
+  }
+  elseif ($section == 'style_options' && isset($form['options']['style_options'])) {
+    // Carry the options kept aside through the settings form.
+    $display = $form_state['view']->display[$form_state['display_id']];
+    $options = $display->handler->get_option('style_options');
+    if (!empty($options['datatables_stash'])) {
+      $form['options']['style_options']['datatables_stash'] = array(
+        '#type' => 'value',
+        '#value' => $options['datatables_stash'],
+      );
+    }
+  }
+}
+
+/**
+ * Submit handler run after the Views handler reset the style options.
+ */
+function datatables_style_switch_restore($form, &$form_state) {
+  $new = isset($form_state['values']['style_plugin']) ? $form_state['values']['style_plugin'] : '';
+  $old = $form_state['datatables_old_style'];
+  $pair = array('table', 'datatables');
+  if ($new === $old || !in_array($new, $pair) || !in_array($old, $pair)) {
+    return;
+  }
+  $old_options = is_array($form_state['datatables_old_options']) ? $form_state['datatables_old_options'] : array();
+  $stash = isset($old_options['datatables_stash']) ? $old_options['datatables_stash'] : array();
+  unset($old_options['datatables_stash']);
+
+  $shared = array('columns', 'default', 'info', 'override', 'order', 'sticky', 'summary', 'caption', 'description', 'empty_table', 'class');
+  $specific = array('elements', 'layout', 'pages', 'hidden_columns', 'filters', 'filter_options', 'sticky_offset');
+
+  $options = array();
+  foreach ($shared as $key) {
+    if (array_key_exists($key, $old_options)) {
+      $options[$key] = $old_options[$key];
+    }
+  }
+  if ($old == 'datatables') {
+    // Remember the DataTables settings for the way back.
+    $keep = array();
+    foreach ($specific as $key) {
+      if (array_key_exists($key, $old_options)) {
+        $keep[$key] = $old_options[$key];
+      }
+    }
+    if ($keep) {
+      $options['datatables_stash'] = $keep;
+    }
+  }
+  else {
+    // Back to DataTables: restore the settings kept aside.
+    foreach ($stash as $key => $value) {
+      $options[$key] = $value;
+    }
+  }
+  // Saving the view in the cache above destroyed its handlers.
+  $view = $form_state['view'];
+  $view->init_display();
+  $view->display[$form_state['display_id']]->handler->set_option('style_options', $options);
+  views_ui_cache_set($form_state['view']);
+}
+
+/**
+ * Implements hook_form_alter().
+ *
  * Views forms of tables with server-side processing and bulk operations: the
  * rows come from the server later, so the form cannot know them.
  */

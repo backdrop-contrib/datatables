@@ -131,6 +131,10 @@ The filter row is not part of exports (copy, CSV, Excel, PDF, print): only the c
 
 The style option *Hide empty column* removes a column from a client-side table when all its cells are empty. With server-side processing the setting is not available (and ignored): which cells are empty depends on the page, but the columns of a DataTable are defined once.
 
+## Switching between Table and DataTable
+
+When the display style of a View is switched between the core *Table* and *DataTable*, the options both styles share (columns, sorting, aliases, separators, sticky header, caption, summary, empty text) are kept. The DataTables specific options (elements, layout, paging, column filters and so on) are kept aside while the View uses the core Table and are restored when switching back, so both styles can be tried without losing any settings.
+
 ## Responsive behaviour
 
 The table is always responsive: when it is too wide for its container (also while the window is being resized), DataTables hides columns, and a click on a row shows the hidden values below it. Which columns go first is derived from the per-column *Responsive priority* of the table style settings (the same setting as for the regular Views table):
