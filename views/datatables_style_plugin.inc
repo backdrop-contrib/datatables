@@ -25,6 +25,7 @@ class datatables_style_plugin extends views_plugin_style_table {
         'table_tools' => FALSE,
         'export_all' => TRUE,
         'export_limit' => 10000,
+        'debug_sql' => FALSE,
       ),
     );
     $options['layout'] = array(
@@ -144,6 +145,12 @@ class datatables_style_plugin extends views_plugin_style_table {
       '#title' => t('Save State'),
       '#default_value' => !empty($this->options['elements']['save_state']),
       '#description' => t("DataTables can use HTML5 localStorage and sessionStorage APIs in the end user's web-browser in order to store it's state after each change in drawing. What this means is that if the user were to reload the page, the table should remain exactly as it was (length, filtering, pagination and sorting)"),
+    );
+    $form['elements']['debug_sql'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Debug: show SQL queries in the browser console'),
+      '#default_value' => !empty($this->options['elements']['debug_sql']),
+      '#description' => t('With server-side processing, the SQL queries of every table request are sent to the browser and written to the JavaScript console (with the time they took). Only users with the permission <em>Administer views</em> receive them; for everybody else nothing changes. Switch this off on production sites when it is not needed.'),
     );
     $form['elements']['table_tools'] = array(
       '#type' => 'checkbox',
@@ -492,6 +499,7 @@ class datatables_style_plugin extends views_plugin_style_table {
     module_load_include('inc', 'views', 'templates/views.theme');
     module_load_include('inc', 'datatables', 'datatables.server');
     $request = $this->view->datatables_request;
+    datatables_server_debug_mark($this->view, 'render');
 
     $this->keep_empty_columns();
 
@@ -535,14 +543,20 @@ class datatables_style_plugin extends views_plugin_style_table {
     }
 
     $filtered = (int) $this->view->total_rows;
+    datatables_server_debug_mark($this->view, 'total');
     $response = array(
       'draw' => $request['draw'],
       'recordsTotal' => datatables_server_total_count($this->view, $request),
       'recordsFiltered' => $filtered,
       'data' => $data,
     );
+    datatables_server_debug_mark($this->view, 'filters');
     if ($request['options']) {
       $response['filterOptions'] = datatables_server_filter_options($this->view, $request);
+    }
+    $debug = datatables_server_debug_collect($this->view);
+    if ($debug !== NULL) {
+      $response['debug'] = $debug;
     }
     $this->view->datatables_response = $response;
 

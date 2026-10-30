@@ -631,10 +631,14 @@ function template_preprocess_datatables_view(&$vars) {
     ),
   );
 
-  // Tell the editor that the preview shows only some of the rows.
-  $preview_limit = _datatables_preview_limit($view);
-  if (!empty($view->live_preview) && $preview_limit > 0 && count($vars['rows']) >= $preview_limit) {
-    $vars['title'] = t('Preview: only the first @count rows are loaded. The limit is set in the style settings.', array('@count' => $preview_limit));
+  // The preview always works client-side; tell the editor, and when the
+  // preview shows only some of the rows.
+  if (!empty($view->live_preview)) {
+    $preview_limit = _datatables_preview_limit($view);
+    $vars['title'] = t('Preview: always uses client-side processing, even if server-side processing is enabled for the display.');
+    if ($preview_limit > 0 && count($vars['rows']) >= $preview_limit) {
+      $vars['title'] .= ' ' . t('Only the first @count rows are loaded; the limit is set in the style settings.', array('@count' => $preview_limit));
+    }
   }
 
   $vars['id'] = _datatables_get_id();
@@ -750,6 +754,7 @@ function datatables_views_pre_view(&$view, &$display_id, &$args) {
 
   $view->datatables_request = $request;
   $view->datatables_role = 'main';
+  datatables_server_debug_start($view);
   // The query result of this request depends on the DataTables parameters, so
   // it must never be served from or stored in the Views cache.
   $view->display_handler->set_option('cache', array('type' => 'none', 'options' => array()));

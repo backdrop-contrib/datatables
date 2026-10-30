@@ -642,6 +642,34 @@
   }
 
   /**
+   * Writes the SQL queries sent by the server (style option "Debug") to the
+   * browser console.
+   */
+  function logSql(debug, request) {
+    var count = 0;
+    $.each(debug.groups || [], function (i, g) {
+      count += g.queries.length;
+    });
+    var open = function (title) {
+      (console.groupCollapsed || console.group || console.log).call(console, title);
+    };
+    var close = function () {
+      if (console.groupEnd) {
+        console.groupEnd();
+      }
+    };
+    open('DataTables SQL (draw ' + request.draw + '): ' + count + ' queries, ' + debug.ms + ' ms');
+    $.each(debug.groups || [], function (i, g) {
+      open(g.title + ' (' + g.queries.length + ', ' + g.ms + ' ms)');
+      $.each(g.queries, function (j, q) {
+        console.log('[' + q.ms + ' ms] ' + q.sql);
+      });
+      close();
+    });
+    close();
+  }
+
+  /**
    * Creates the DataTables "ajax" function for server-side processing.
    */
   function createAjax($table, cfg, state) {
@@ -712,6 +740,9 @@
         if (!response) {
           fail(Backdrop.t('The server did not return any data. Check that the view display is accessible and does not use caching.'));
           return;
+        }
+        if (response.debug && window.console) {
+          logSql(response.debug, request);
         }
         if (response.filterOptions) {
           state.optionsLoaded = true;

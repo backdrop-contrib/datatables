@@ -39,7 +39,7 @@ With server-side processing every page, sort and search request is sent to Backd
 
 ### Views preview
 
-The preview of the Views editor is reloaded after every change and always works client-side. To keep it fast it only loads the number of rows set under*Pagination and Page Length: Rows in the Views preview* (default 100, 0 = all); a caption tells when rows were left out. The real page is not affected. If itis still too slow, switch off *Auto preview* below the view settings.
+The preview of the Views editor is reloaded after every change and always works client-side, even when server-side processing is enabled. To keep it fast it only loads the number of rows set under*Pagination and Page Length: Rows in the Views preview* (default 100, 0 = all); a caption tells when rows were left out. The real page is not affected. If itis still too slow, switch off *Auto preview* below the view settings.
 
 ## Column filters
 
@@ -134,6 +134,10 @@ The style option *Hide empty column* removes a column from a client-side table w
 ## Switching between Table and DataTable
 
 When the display style of a View is switched between the core *Table* and *DataTable*, the options both styles share (columns, sorting, aliases, separators, sticky header, caption, summary, empty text) are kept. The DataTables specific options (elements, layout, paging, column filters and so on) are kept aside while the View uses the core Table and are restored when switching back, so both styles can be tried without losing any settings.
+
+## Debugging SQL queries
+
+The style option *Debug: show SQL queries in the browser console* (under the elements) sends the SQL queries of every server-side table request to the browser, where they are written to the JavaScript console as a collapsed group with the time each query took (values filled in, cache and session queries left out). This shows the final query with column filters, search, ordering and paging, the count queries and the queries for the filter lists. Only users with the permission *Administer views* receive the queries; for everybody else nothing is sent. Switch the option off when it is not needed.
 
 ## Responsive behaviour
 

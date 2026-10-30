@@ -942,3 +942,115 @@ function datatables_server_filter_options($view, array $request) {
 
   return $result;
 }
+
+/**
+ * Starts the query log of a table request, if the style option "Debug" is on.
+ *
+ * Only users who may administer views get the queries.
+ */
+function datatables_server_debug_start($view) {
+  $options = $view->display_handler->get_option('style_options');
+  if (empty($options['elements']['debug_sql']) || !user_access('administer views')) {
+    return;
+  }
+  Database::startLog('datatables', 'default');
+  $view->datatables_debug = TRUE;
+}
+
+/**
+ * Notes how many queries were logged so far (a phase of the request starts).
+ */
+function datatables_server_debug_mark($view, $phase) {
+  if (empty($view->datatables_debug)) {
+    return;
+  }
+  $logger = Database::getConnection('default')->getLogger();
+  $view->datatables_debug_marks[$phase] = $logger ? count($logger->get('datatables')) : 0;
+}
+
+/**
+ * Returns the logged SQL queries of the request for the browser console.
+ *
+ * The queries are grouped: the main query of the table (limited to the tables
+ * of the view), the number of all records, and the lists of the column
+ * filters. Everything done between them (rendering the fields, URL aliases and
+ * so on) is left out. Each query has the values filled in ("sql") and the time
+ * in milliseconds ("ms"). Returns NULL when the debug option is off or the
+ * user may not see the queries.
+ */
+function datatables_server_debug_collect($view) {
+  if (empty($view->datatables_debug) || !user_access('administer views')) {
+    return NULL;
+  }
+  datatables_server_debug_mark($view, 'end');
+  $marks = $view->datatables_debug_marks + array('render' => 0, 'total' => 0, 'filters' => 0, 'end' => 0);
+
+  // The tables of the view: the base table, relationships and fields.
+  $tables = array();
+  if (!empty($view->query->table_queue)) {
+    foreach ($view->query->table_queue as $info) {
+      if (!empty($info['table']) && is_string($info['table'])) {
+        $tables[$info['table']] = TRUE;
+      }
+    }
+  }
+
+  $log = Database::getConnection('default')->getLogger()->get('datatables');
+  $phases = array(
+    'main' => array('title' => 'Main query', 'from' => 0, 'to' => $marks['render'], 'restrict' => TRUE),
+    'total' => array('title' => 'Number of all records', 'from' => $marks['total'], 'to' => $marks['filters'], 'restrict' => FALSE),
+    'filters' => array('title' => 'Column filter lists', 'from' => $marks['filters'], 'to' => $marks['end'], 'restrict' => FALSE),
+  );
+  $groups = array();
+  $total = 0;
+  foreach ($phases as $phase) {
+    $queries = array();
+    $ms_group = 0;
+    for ($i = $phase['from']; $i < $phase['to'] && isset($log[$i]); $i++) {
+      $entry = $log[$i];
+      // Housekeeping is not what the user looks for.
+      if (preg_match('/information_schema|\burl_alias\b|\b(cache\w*|semaphore|sessions|watchdog|flood)\b/i', $entry['query'])) {
+        continue;
+      }
+      if ($phase['restrict']) {
+        // The lookups of labels for the search (list values, entity names) run
+        // on other tables, and are marked by their alias "e".
+        $used = strpos($entry['query'], 'SELECT `e`.') === 0;
+        foreach ($tables as $table => $unused) {
+          if (strpos($entry['query'], '`' . $table . '`') !== FALSE) {
+            $used = TRUE;
+            break;
+          }
+        }
+        if (!$used) {
+          continue;
+        }
+      }
+      $replace = array();
+      $args = is_array($entry['args']) ? $entry['args'] : array();
+      foreach ($args as $name => $value) {
+        if (is_null($value)) {
+          $replace[$name] = 'NULL';
+        }
+        elseif (is_int($value) || is_float($value)) {
+          $replace[$name] = (string) $value;
+        }
+        else {
+          $replace[$name] = "'" . str_replace("'", "\\'", (string) $value) . "'";
+        }
+      }
+      // strtr() replaces the longest names first, so :db_condition_placeholder_1
+      // is not hit by :db_condition_placeholder_10.
+      $sql = $replace ? strtr($entry['query'], $replace) : $entry['query'];
+      $ms = round($entry['time'] * 1000, 2);
+      $ms_group += $ms;
+      $queries[] = array('sql' => trim($sql), 'ms' => $ms);
+    }
+    if ($queries) {
+      $total += $ms_group;
+      $groups[] = array('title' => $phase['title'], 'ms' => round($ms_group, 2), 'queries' => $queries);
+    }
+  }
+  unset($view->datatables_debug);
+  return array('groups' => $groups, 'ms' => round($total, 2));
+}
