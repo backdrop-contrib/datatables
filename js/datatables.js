@@ -642,6 +642,21 @@
   }
 
   /**
+   * Render function of the columns that sort by the data-order attribute.
+   */
+  function sortKeyRender(data, type, row, meta) {
+    if (type === 'sort' || type === 'type') {
+      var row_data = meta && meta.settings && meta.settings.aoData[meta.row];
+      var cell = row_data && row_data.anCells && row_data.anCells[meta.col];
+      var key = cell && cell.getAttribute && cell.getAttribute('data-order');
+      if (key !== null && key !== undefined && key !== '') {
+        return key;
+      }
+    }
+    return data;
+  }
+
+  /**
    * Writes the SQL queries sent by the server (style option "Debug") to the
    * browser console.
    */
@@ -1307,6 +1322,17 @@
           if (cfg && !$.isEmptyObject(cfg.filters) && options.columns) {
             $.each(options.columns, function (i, column) {
               delete column.title;
+            });
+          }
+
+          // Dates and file sizes are sorted by the data-order attribute of
+          // their cells (DataTables only reads it with a "data" setting that
+          // we do not use, so the sort value is taken from the cell here).
+          if (cfg && !cfg.serverSide && cfg.sortKeys && options.columns) {
+            $.each(options.columns, function (i, column) {
+              if (column && $.inArray(column.data, cfg.sortKeys) !== -1) {
+                column.render = sortKeyRender;
+              }
             });
           }
 

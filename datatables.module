@@ -382,6 +382,11 @@ function template_preprocess_datatables_view(&$vars) {
         $column_options['type'] = 'string';
         $date_fields[$field] = TRUE;
       }
+      // File sizes ("1.5 MB") are sorted by the number of bytes in the same way.
+      elseif ($fields[$field] instanceof views_handler_field_file_size) {
+        $column_options['type'] = 'string';
+        $date_fields[$field] = TRUE;
+      }
       // Column filters (text box or drop-down with the distinct values).
       // With server-side processing only columns that can be filtered in SQL
       // get a filter, otherwise it would silently do nothing.
@@ -528,6 +533,8 @@ function template_preprocess_datatables_view(&$vars) {
     'kinds' => $column_kinds,
     'zones' => $column_zones,
     'bulk' => $bulk_columns,
+    // Columns sorted by the data-order attribute of their cells.
+    'sortKeys' => array_keys($date_fields),
     'timezone' => backdrop_get_user_timezone(),
     'cascade' => !empty($options['filter_options']['cascade']),
     // A table with a fixed height scrolls its body inside the page; its
@@ -1110,6 +1117,11 @@ function datatables_column_db_type($handler) {
  *   Empty if the row has no value.
  */
 function datatables_date_sort_key($handler, $result) {
+  if ($handler instanceof views_handler_field_file_size) {
+    $bytes = isset($result->{$handler->field_alias}) ? $result->{$handler->field_alias} : '';
+    // Fixed length, so text order is numeric order.
+    return is_numeric($bytes) ? sprintf('%020.0f', max(0, (float) $bytes)) : '';
+  }
   $info = datatables_date_column_info($handler);
   $raw = '';
   if ($info && $handler instanceof views_handler_field_field) {
