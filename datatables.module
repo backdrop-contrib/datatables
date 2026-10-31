@@ -39,6 +39,11 @@ function datatables_library_info() {
       'website' => 'https://datatables.net/',
       'version' => '2.3.8',
       'js' => array(
+        // Protect the libraries from a page element named "exports", see
+        // js/exports-guard-start.js. The guard is removed again after all
+        // library files (also those of the Buttons library), by its weight.
+        backdrop_get_path('module', 'datatables') . '/js/exports-guard-start.js' => array('weight' => -100),
+        backdrop_get_path('module', 'datatables') . '/js/exports-guard-end.js' => array('weight' => 100),
         $lib_path . '/dataTables.min.js' => array(),
         $lib_path . '/dataTables.responsive.min.js' => array(),
         $lib_path . '/dataTables.scroller.min.js' => array(),
